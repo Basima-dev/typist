@@ -14,7 +14,7 @@ var (
 	accStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("#89dceb")).Bold(true)
 	timeStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#89b4fa"))
 	subtleStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#585b70"))
-	hintStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#313244"))
+	hintStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#585b70"))
 	pbStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("#1e1e2e")).Background(lipgloss.Color("#f9e2af")).Bold(true)
 	errorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
 
