@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,7 +14,8 @@ type ScoreEntry struct {
 	WPM      float64   `json:"wpm"`
 	Accuracy float64   `json:"accuracy"`
 	Mode     string    `json:"mode"`
-	Duration int       `json:"duration_seconds"` // 0 = word mode
+	Lang     string    `json:"lang,omitempty"`
+	Duration int       `json:"duration_seconds"`
 	At       time.Time `json:"at"`
 }
 
@@ -38,29 +41,85 @@ func loadScores() ScoreBoard {
 func saveScore(entry ScoreEntry) {
 	sb := loadScores()
 	sb.Entries = append(sb.Entries, entry)
-
-	// Keep only top 100
 	sort.Slice(sb.Entries, func(i, j int) bool {
 		return sb.Entries[i].WPM > sb.Entries[j].WPM
 	})
-	if len(sb.Entries) > 100 {
-		sb.Entries = sb.Entries[:100]
+	if len(sb.Entries) > 500 {
+		sb.Entries = sb.Entries[:500]
 	}
-
 	path := scorePath()
 	_ = os.MkdirAll(filepath.Dir(path), 0755)
 	data, _ := json.MarshalIndent(sb, "", "  ")
 	_ = os.WriteFile(path, data, 0644)
 }
 
-// personalBest returns the best WPM for a given mode key, or 0.
-func personalBest(mode string, duration int) float64 {
+func personalBest(mode, lang string, duration int) float64 {
 	sb := loadScores()
 	best := 0.0
 	for _, e := range sb.Entries {
-		if e.Mode == mode && e.Duration == duration && e.WPM > best {
+		if e.Mode == mode && e.Lang == lang && e.Duration == duration && e.WPM > best {
 			best = e.WPM
 		}
 	}
 	return best
+}
+
+// recentSessions returns the most recent n sessions sorted by time desc.
+func recentSessions(n int) []ScoreEntry {
+	sb := loadScores()
+	entries := make([]ScoreEntry, len(sb.Entries))
+	copy(entries, sb.Entries)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].At.After(entries[j].At)
+	})
+	if len(entries) > n {
+		return entries[:n]
+	}
+	return entries
+}
+
+// exportJSON writes all scores to ~/typist-export-<ts>.json and returns the path.
+func exportJSON() (string, error) {
+	sb := loadScores()
+	home, _ := os.UserHomeDir()
+	ts := time.Now().Format("20060102-150405")
+	path := filepath.Join(home, fmt.Sprintf("typist-export-%s.json", ts))
+	data, err := json.MarshalIndent(sb.Entries, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return path, os.WriteFile(path, data, 0644)
+}
+
+// exportCSV writes all scores to ~/typist-export-<ts>.csv and returns the path.
+func exportCSV() (string, error) {
+	sb := loadScores()
+	sort.Slice(sb.Entries, func(i, j int) bool {
+		return sb.Entries[i].At.After(sb.Entries[j].At)
+	})
+
+	home, _ := os.UserHomeDir()
+	ts := time.Now().Format("20060102-150405")
+	path := filepath.Join(home, fmt.Sprintf("typist-export-%s.csv", ts))
+
+	f, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	w := csv.NewWriter(f)
+	_ = w.Write([]string{"wpm", "accuracy", "mode", "lang", "duration_seconds", "at"})
+	for _, e := range sb.Entries {
+		_ = w.Write([]string{
+			fmt.Sprintf("%.1f", e.WPM),
+			fmt.Sprintf("%.1f", e.Accuracy),
+			e.Mode,
+			e.Lang,
+			fmt.Sprintf("%d", e.Duration),
+			e.At.Format(time.RFC3339),
+		})
+	}
+	w.Flush()
+	return path, w.Error()
 }
