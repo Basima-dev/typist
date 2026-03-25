@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 type appState int
 
 const (
-	stateMenu    appState = iota
+	stateMenu appState = iota
 	stateTyping
 	stateResults
 	stateHistory
@@ -37,7 +36,7 @@ var modeCount = len(modeNames)
 
 const (
 	numWords     = 30
-	lineWidth    = 60
+	lineWidth    = 65
 	visLines     = 3
 	histPageSize = 12
 	sparkWidth   = 32 // WPM sparkline bar count
@@ -50,7 +49,7 @@ var sparkBars = []rune("▁▂▃▄▅▆▇█")
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 
-type tickMsg   time.Time
+type tickMsg time.Time
 type exportMsg struct {
 	path   string
 	err    error
@@ -88,9 +87,9 @@ type Model struct {
 	state appState
 	mode  testMode
 
-	timeLimitIdx int
-	timeLeft     int
-	langIdx      int
+	timeLimitIdx  int
+	timeLeft      int
+	langIdx       int
 	activeSnippet Snippet
 
 	target      []rune
@@ -100,9 +99,9 @@ type Model struct {
 	elapsed     time.Duration
 	started     bool
 
-	blindMode  bool
-	focusMode  bool // hide stats while typing
-	darkTheme  bool // true = mocha, false = latte
+	blindMode bool
+	focusMode bool // hide stats while typing
+	darkTheme bool // true = mocha, false = latte
 
 	totalKeys int
 	errors    int
@@ -114,10 +113,10 @@ type Model struct {
 	lastSample time.Time
 
 	// frozen results
-	finalWPM    float64
-	finalAcc    float64
-	isPB        bool
-	exportMsg   string
+	finalWPM  float64
+	finalAcc  float64
+	isPB      bool
+	exportMsg string
 
 	// pre-computed token kinds for syntax highlighting
 	// per-rune Chroma styles (code mode only)
@@ -541,25 +540,28 @@ func (m Model) View() string {
 // ── Menu view ─────────────────────────────────────────────────────────────────
 
 func (m Model) viewMenu() string {
-	title := titleStyle.Render("typist")
-	sub := subtleStyle.Render("offline · open source · no paywall")
+	// Logo
+	logo := titleStyle.Render("typist")
+	tagline := subtleStyle.Render("offline · open source · no paywall")
 
+	// Mode pills — monkeytype style: all on one row, selected is bright
 	var modeBtns []string
 	for i, label := range modeNames {
 		if i == int(m.mode) {
-			modeBtns = append(modeBtns, selectedStyle.Render(" "+label+" "))
+			modeBtns = append(modeBtns, selectedStyle.Render(label))
 		} else {
-			modeBtns = append(modeBtns, optionStyle.Render(" "+label+" "))
+			modeBtns = append(modeBtns, optionStyle.Render(label))
 		}
 	}
 	modeRow := lipgloss.JoinHorizontal(lipgloss.Center, modeBtns...)
 
+	// Sub-options (time durations or language picker) — dimmer row below
 	var subRow string
 	switch m.mode {
 	case modeTime:
 		var btns []string
 		for i, t := range timeLimits {
-			label := fmt.Sprintf("%ds", t)
+			label := fmt.Sprintf("%d", t)
 			s := optionStyle
 			if i == m.timeLimitIdx {
 				s = dimSelectedStyle
@@ -567,7 +569,7 @@ func (m Model) viewMenu() string {
 					s = selectedStyle
 				}
 			}
-			btns = append(btns, s.Render(" "+label+" "))
+			btns = append(btns, s.Render(label))
 		}
 		subRow = "\n" + lipgloss.JoinHorizontal(lipgloss.Center, btns...)
 	case modeCode:
@@ -580,20 +582,27 @@ func (m Model) viewMenu() string {
 					s = selectedStyle
 				}
 			}
-			btns = append(btns, s.Render(" "+lang+" "))
+			btns = append(btns, s.Render(lang))
 		}
 		subRow = "\n" + lipgloss.JoinHorizontal(lipgloss.Center, btns...)
 	}
 
-	hint := subtleStyle.Render("← → switch")
+	var hint string
 	if m.mode == modeTime || m.mode == modeCode {
-		hint = subtleStyle.Render("← → switch · ↑ ↓ row · enter start · esc quit")
+		hint = hintStyle.Render("← →  mode   ↑ ↓  option   enter  start   esc  quit")
 	} else {
-		hint = subtleStyle.Render("← → switch · enter start · esc quit")
+		hint = hintStyle.Render("← →  mode   enter  start   esc  quit")
 	}
 
 	body := lipgloss.JoinVertical(lipgloss.Center,
-		title, sub, "", modeRow+subRow, "", hint,
+		logo,
+		tagline,
+		"",
+		"",
+		modeRow+subRow,
+		"",
+		"",
+		hint,
 	)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
@@ -683,31 +692,35 @@ func (m Model) viewTyping() string {
 		langTag = "   " + subtleStyle.Render(langKeys[m.langIdx])
 	}
 
+	// Progress bar — filled with thin unicode blocks
+	progress := m.renderProgress()
+
 	var parts []string
 	if !m.focusMode {
-		stats := lipgloss.JoinHorizontal(lipgloss.Top,
-			wpmStyle.Render(fmt.Sprintf("%.0f", m.calcWPM())),
-			subtleStyle.Render(" wpm   "),
-			accStyle.Render(fmt.Sprintf("%.0f%%", m.calcAccuracy())),
-			subtleStyle.Render(" acc"),
-			timerPart, langTag, blindTag,
-		)
+		// Stats row: big WPM on left, acc centre, timer/lang/tags right
+		wpmNum := wpmStyle.Render(fmt.Sprintf("%.0f", m.calcWPM()))
+		wpmLabel := subtleStyle.Render(" wpm")
+		accNum := accStyle.Render(fmt.Sprintf("%.0f", m.calcAccuracy()))
+		accLabel := subtleStyle.Render("% acc")
+		statsLeft := lipgloss.JoinHorizontal(lipgloss.Top, wpmNum, wpmLabel)
+		statsRight := lipgloss.JoinHorizontal(lipgloss.Top, accNum, accLabel, timerPart, langTag, blindTag)
+		spacer := strings.Repeat(" ", 4)
+		stats := lipgloss.JoinHorizontal(lipgloss.Top, statsLeft, spacer, statsRight)
 		parts = append(parts, stats, "")
 
-		var meta string
 		switch m.mode {
 		case modeQuote:
-			meta = subtleStyle.Render("— " + m.activeQuote.Author)
+			parts = append(parts, subtleStyle.Render("— "+m.activeQuote.Author))
 		case modeCode:
-			meta = subtleStyle.Render(langKeys[m.langIdx] + " · tab+enter live")
-		}
-		if meta != "" {
-			parts = append(parts, meta)
+			parts = append(parts, subtleStyle.Render(langKeys[m.langIdx]+" snippet"))
 		}
 	}
 
-	hint := hintStyle.Render("ctrl+r restart · ctrl+b blind · ctrl+f focus · ctrl+t theme · esc quit")
-	parts = append(parts, textBlock, "", hint)
+	parts = append(parts, progress, textBlock, "")
+
+	if !m.focusMode {
+		parts = append(parts, hintStyle.Render("tab  enter  ctrl+r  ctrl+b  ctrl+f  ctrl+t  esc"))
+	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left, parts...)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
@@ -724,56 +737,57 @@ func (m Model) pendingWithHL(pos int, display string) string {
 // ── Results view ──────────────────────────────────────────────────────────────
 
 func (m Model) viewResults() string {
-	title := titleStyle.Render("results")
-
-	pbTag := ""
-	if m.isPB {
-		pbTag = "  " + pbStyle.Render(" new best! ")
-	}
-
-	wpmLine := lipgloss.JoinHorizontal(lipgloss.Top,
-		wpmStyle.Render(fmt.Sprintf("%-8.0f", m.finalWPM)),
-		subtleStyle.Render("wpm"), pbTag,
-	)
-	accLine := lipgloss.JoinHorizontal(lipgloss.Top,
-		accStyle.Render(fmt.Sprintf("%-8.1f", m.finalAcc)),
-		subtleStyle.Render("accuracy"),
-	)
-	timeLine := lipgloss.JoinHorizontal(lipgloss.Top,
-		timeStyle.Render(fmt.Sprintf("%-8.1f", m.elapsed.Seconds())),
-		subtleStyle.Render("seconds"),
-	)
-
 	dur := 0
 	if m.mode == modeTime {
 		dur = timeLimits[m.timeLimitIdx]
 	}
 	pb := personalBest(m.modeKey(), m.langKey(), dur)
-	pbLine := lipgloss.JoinHorizontal(lipgloss.Top,
-		subtleStyle.Render(fmt.Sprintf("%-8.0f", pb)),
-		subtleStyle.Render("personal best"),
-	)
 
-	// WPM sparkline
-	sparkLine := m.renderSparkline()
+	// ── Stat blocks: big number + small label below ───────────────────────
+	// Use a large bold style for the numbers to give visual weight.
+	numStyle := lipgloss.NewStyle().Bold(true)
 
-	// Mistake heatmap (top 6 most missed chars)
-	heatLine := m.renderMistakeHeat()
+	wpmNum := numStyle.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM))
+	accNum := numStyle.Foreground(activeTheme.acc).Render(fmt.Sprintf("%.1f%%", m.finalAcc))
+	timeNum := numStyle.Foreground(activeTheme.timer).Render(fmt.Sprintf("%.1fs", m.elapsed.Seconds()))
+	pbNum := numStyle.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", pb))
 
-	card := cardStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
-		title, "",
-		wpmLine, accLine, timeLine, "", pbLine, "",
-		subtleStyle.Render("wpm over time"),
-		sparkLine,
-		heatLine,
-	))
+	pbBadge := ""
+	if m.isPB {
+		pbBadge = "  " + pbStyle.Render(" new best! ")
+	}
 
-	actions := lipgloss.JoinVertical(lipgloss.Left,
-		pendingStyle.Render("enter / r  → again"),
-		pendingStyle.Render("m          → menu"),
-		pendingStyle.Render("h          → history"),
-		pendingStyle.Render("j / c      → export json / csv"),
-		hintStyle.Render("esc        → quit"),
+	colW := 12
+	wpmCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, wpmNum+pbBadge, subtleStyle.Render("wpm")))
+	accCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, accNum, subtleStyle.Render("acc")))
+	timeCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, timeNum, subtleStyle.Render("time")))
+	pbCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, pbNum, subtleStyle.Render("best")))
+
+	statsRow := lipgloss.JoinHorizontal(lipgloss.Bottom, wpmCol, accCol, timeCol, pbCol)
+
+	// ── Divider ───────────────────────────────────────────────────────────
+	divW := colW * 4
+	div := subtleStyle.Render(strings.Repeat("─", divW))
+
+	// ── Vertical bar chart ────────────────────────────────────────────────
+	chartRows := m.renderBarChart(divW)
+
+	// ── Keyboard heatmap ──────────────────────────────────────────────────
+	kbRows := m.renderKeyboard()
+
+	// ── Actions ───────────────────────────────────────────────────────────
+	sep := hintStyle.Render("  ·  ")
+	actions := lipgloss.JoinHorizontal(lipgloss.Top,
+		pendingStyle.Render("enter"), hintStyle.Render(" again"),
+		sep, pendingStyle.Render("m"), hintStyle.Render(" menu"),
+		sep, pendingStyle.Render("h"), hintStyle.Render(" history"),
+		sep, pendingStyle.Render("j"), hintStyle.Render(" json"),
+		sep, pendingStyle.Render("c"), hintStyle.Render(" csv"),
+		sep, pendingStyle.Render("esc"), hintStyle.Render(" quit"),
 	)
 
 	var exportLine string
@@ -781,104 +795,216 @@ func (m Model) viewResults() string {
 		exportLine = "\n" + m.exportMsg
 	}
 
-	body := lipgloss.JoinVertical(lipgloss.Center, card, "", actions, exportLine)
+	parts := []string{"", statsRow, "", div, ""}
+	parts = append(parts, chartRows...)
+	if len(kbRows) > 0 {
+		parts = append(parts, "", hintStyle.Render("mistakes"))
+		parts = append(parts, kbRows...)
+	}
+	parts = append(parts, "", actions)
+	if exportLine != "" {
+		parts = append(parts, exportLine)
+	}
+
+	body := lipgloss.JoinVertical(lipgloss.Left, parts...)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
 
-// renderSparkline builds an ASCII bar chart from wpmSamples.
-func (m Model) renderSparkline() string {
+// renderProgress draws a thin progress bar showing completion through the text.
+func (m Model) renderProgress() string {
+	total := len(m.target)
+	if total == 0 {
+		return ""
+	}
+	done := len(m.input)
+	if done > total {
+		done = total
+	}
+	width := 40
+	filled := int(float64(done) / float64(total) * float64(width))
+	bar := strings.Repeat("─", filled) + strings.Repeat(" ", width-filled)
+	pct := int(float64(done) / float64(total) * 100)
+	return hintStyle.Render("│") +
+		subtleStyle.Render(bar) +
+		hintStyle.Render("│") +
+		hintStyle.Render(fmt.Sprintf(" %d%%", pct))
+}
+
+// renderBarChart renders a vertical bar chart of wpmSamples.
+// Returns a slice of strings — one per row — so the caller can join them.
+func (m Model) renderBarChart(width int) []string {
 	samples := m.wpmSamples
+	chartH := 6 // rows tall
+	chartW := width
+
 	if len(samples) == 0 {
-		return subtleStyle.Render("no data")
+		return []string{subtleStyle.Render("no data yet")}
 	}
 
-	// Downsample / upsample to sparkWidth
-	bars := make([]float64, sparkWidth)
-	for i := range bars {
-		idx := int(float64(i) / float64(sparkWidth) * float64(len(samples)))
+	// Sample down/up to chartW columns
+	cols := make([]float64, chartW)
+	for i := range cols {
+		idx := int(float64(i) / float64(chartW) * float64(len(samples)))
 		if idx >= len(samples) {
 			idx = len(samples) - 1
 		}
-		bars[i] = samples[idx]
+		cols[i] = samples[idx]
 	}
 
-	maxWPM := 0.0
-	for _, v := range bars {
-		if v > maxWPM {
-			maxWPM = v
+	maxV := 0.0
+	minV := cols[0]
+	peakIdx := 0
+	for i, v := range cols {
+		if v > maxV {
+			maxV = v
+			peakIdx = i
+		}
+		if v < minV {
+			minV = v
 		}
 	}
-	if maxWPM == 0 {
-		maxWPM = 1
-	}
-
-	var sb strings.Builder
-	for i, v := range bars {
-		normalized := v / maxWPM
-		barIdx := int(normalized * float64(len(sparkBars)-1))
-		if barIdx < 0 {
-			barIdx = 0
-		}
-		ch := string(sparkBars[barIdx])
-		// Highlight peak
-		if v == maxWPM {
-			sb.WriteString(sparkPeakStyle.Render(ch))
-		} else {
-			sb.WriteString(sparkBarStyle.Render(ch))
-		}
-		_ = i
+	if maxV == 0 {
+		maxV = 1
 	}
 
-	// Min/max labels
-	minWPM := bars[0]
-	for _, v := range bars {
-		if v < minWPM {
-			minWPM = v
-		}
+	// Heights: 0..chartH for each column
+	heights := make([]int, chartW)
+	for i, v := range cols {
+		heights[i] = int(v / maxV * float64(chartH))
 	}
-	label := subtleStyle.Render(fmt.Sprintf(" %.0f–%.0f wpm", minWPM, maxWPM))
-	return sb.String() + label
+
+	// Build rows top→bottom
+	rows := make([]string, chartH)
+	for row := 0; row < chartH; row++ {
+		// row 0 = top, row chartH-1 = bottom
+		threshold := chartH - row // bar must be >= threshold to fill this cell
+		var sb strings.Builder
+		for ci, h := range heights {
+			if h >= threshold {
+				if ci == peakIdx {
+					sb.WriteString(sparkPeakStyle.Render("█"))
+				} else {
+					// Shade bars: brighter nearer the top
+					if threshold > chartH/2 {
+						sb.WriteString(subtleStyle.Render("▓"))
+					} else {
+						sb.WriteString(sparkBarStyle.Render("█"))
+					}
+				}
+			} else {
+				sb.WriteString(hintStyle.Render("░"))
+			}
+		}
+		rows[row] = sb.String()
+	}
+
+	// Y-axis labels (right side)
+	rows[0] += "  " + subtleStyle.Render(fmt.Sprintf("%.0f wpm", maxV))
+	rows[chartH/2] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", (maxV+minV)/2))
+	rows[chartH-1] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", minV))
+
+	// X-axis (time labels)
+	xAxis := strings.Repeat("─", chartW)
+	timeLabel := fmt.Sprintf("0s%s%.0fs", strings.Repeat(" ", chartW-6), float64(len(samples)))
+	result := []string{hintStyle.Render("wpm")}
+	result = append(result, rows...)
+	result = append(result, hintStyle.Render(xAxis))
+	result = append(result, subtleStyle.Render(timeLabel))
+	return result
 }
 
-// renderMistakeHeat shows the top missed characters.
-func (m Model) renderMistakeHeat() string {
+// renderKeyboard renders a simplified QWERTY heatmap — rows of keys
+// colored by mistake frequency. Returns one string per keyboard row.
+func (m Model) renderKeyboard() []string {
 	if len(m.mistakeMap) == 0 {
-		return ""
+		return nil
 	}
 
-	entries := make([]mistakeEntry, 0, len(m.mistakeMap))
-	for ch, count := range m.mistakeMap {
-		entries = append(entries, mistakeEntry{ch, count})
+	// Find max for normalisation
+	maxCount := 0
+	for _, n := range m.mistakeMap {
+		if n > maxCount {
+			maxCount = n
+		}
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].count > entries[j].count
-	})
-	if len(entries) > 6 {
-		entries = entries[:6]
+	if maxCount == 0 {
+		maxCount = 1
 	}
 
-	var sb strings.Builder
-	sb.WriteString(subtleStyle.Render("missed: "))
-	for _, e := range entries {
-		label := string(e.ch)
-		switch e.ch {
-		case ' ':
-			label = "spc"
-		case '\t':
-			label = "tab"
-		case '\n':
-			label = "ret"
-		}
-		// Color intensity by count
-		style := hlComment
-		if e.count >= 5 {
-			style = incorrectStyle
-		} else if e.count >= 2 {
-			style = hlNumber
-		}
-		sb.WriteString(style.Render(fmt.Sprintf("[%s×%d] ", label, e.count)))
+	kbLayout := [][]string{
+		{"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
+		{"a", "s", "d", "f", "g", "h", "j", "k", "l"},
+		{"z", "x", "c", "v", "b", "n", "m"},
 	}
-	return sb.String()
+	special := map[rune]string{
+		' ':  "spc",
+		'\t': "tab",
+		'\n': "ret",
+	}
+
+	// Build lookup: display string → count
+	countFor := func(key string) int {
+		// Try as rune
+		r := []rune(key)
+		if len(r) == 1 {
+			return m.mistakeMap[r[0]]
+		}
+		return 0
+	}
+	// special keys stored as rune
+	specCount := map[string]int{
+		"spc": m.mistakeMap[' '],
+		"tab": m.mistakeMap['\t'],
+		"ret": m.mistakeMap['\n'],
+	}
+	_ = special
+
+	renderKey := func(label string, count int) string {
+		h := float64(count) / float64(maxCount)
+		var style lipgloss.Style
+		switch {
+		case count == 0:
+			style = lipgloss.NewStyle().
+				Foreground(activeTheme.hint).
+				Background(activeTheme.pending).
+				Padding(0, 1)
+		case h < 0.4:
+			style = lipgloss.NewStyle().
+				Foreground(activeTheme.hlNum).
+				Background(lipgloss.Color("#313244")).
+				Padding(0, 1)
+		default:
+			style = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#1e1e2e")).
+				Background(activeTheme.wrong).
+				Padding(0, 1).
+				Bold(true)
+		}
+		return style.Render(label)
+	}
+
+	var rows []string
+	for _, row := range kbLayout {
+		var sb strings.Builder
+		for i, k := range row {
+			if i > 0 {
+				sb.WriteString(" ")
+			}
+			sb.WriteString(renderKey(k, countFor(k)))
+		}
+		rows = append(rows, sb.String())
+	}
+
+	// Special keys row
+	var spRow strings.Builder
+	for i, k := range []string{"spc", "tab", "ret"} {
+		if i > 0 {
+			spRow.WriteString("  ")
+		}
+		spRow.WriteString(renderKey(k, specCount[k]))
+	}
+	rows = append(rows, spRow.String())
+	return rows
 }
 
 // ── History view ──────────────────────────────────────────────────────────────

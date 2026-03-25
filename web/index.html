@@ -3,260 +3,627 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>typist</title>
+<title>typist — offline typing test for developers</title>
+<meta name="description" content="A fast, offline typing test for developers. Words, quotes, and real code snippets. No account. No paywall.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <style>
+/* ── Reset + Catppuccin Mocha ────────────────────────────────────────────── */
 :root {
-  --base:#1e1e2e; --mantle:#181825; --s0:#313244; --s1:#45475a; --ov0:#6c7086;
-  --text:#cdd6f4; --sub0:#a6adc8;
-  --mauve:#cba6f7; --green:#a6e3a1; --red:#f38ba8;
-  --yellow:#f9e2af; --blue:#89b4fa; --sky:#89dceb; --peach:#fab387;
+  --base:   #1e1e2e; --mantle: #181825; --crust:  #11111b;
+  --s0: #313244; --s1: #45475a; --s2: #585b70; --ov: #6c7086;
+  --tx: #cdd6f4; --sub: #a6adc8;
+  --mauve: #cba6f7; --green: #a6e3a1; --red: #f38ba8;
+  --yellow: #f9e2af; --blue: #89b4fa; --sky: #89dceb; --peach: #fab387;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
 }
-*{box-sizing:border-box;margin:0;padding:0;}
-body{
-  background:var(--base);color:var(--text);
-  font-family:'Courier New',monospace;
-  min-height:100vh;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:1.5rem;padding:2rem;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  background: var(--base); color: var(--tx);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
 }
-header{text-align:center;}
-h1{font-size:2rem;color:var(--mauve);letter-spacing:.2em;}
-.subtitle{color:var(--s1);font-size:.8rem;margin-top:.25rem;}
-.controls{display:flex;flex-direction:column;align-items:center;gap:.5rem;}
-.btn-row{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center;}
-.btn{
-  background:transparent;border:1px solid var(--s0);color:var(--ov0);
-  padding:.25rem .8rem;border-radius:6px;cursor:pointer;
-  font-family:inherit;font-size:.85rem;transition:all .15s;
-}
-.btn:hover{border-color:var(--s1);color:var(--sub0);}
-.btn.active{background:var(--mauve);border-color:var(--mauve);color:var(--base);font-weight:bold;}
 
-/* ── Typing area ── */
-#typing-area{width:min(720px,100%);}
-#attribution{color:var(--s1);font-size:.78rem;margin-bottom:.4rem;min-height:1.1em;}
-
-/* Code display: pre-formatted, line by line */
-#word-display{
-  font-size:1.2rem;line-height:1.9rem;
-  height:calc(3*1.9rem);overflow:hidden;user-select:none;
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 2rem;
+  border-bottom: 1px solid var(--s0);
 }
-/* Code mode: each line is a block div */
-.code-line{display:block;white-space:pre;}
-/* Prose mode: inline spans flow naturally */
-.word{display:inline-block;margin-right:.4em;}
+.nav-logo { color: var(--mauve); font-family: var(--font-mono); font-size: 1.1rem; font-weight: 600; letter-spacing: .1em; }
+.nav-links { display: flex; gap: 1.5rem; }
+.nav-links a { color: var(--s2); text-decoration: none; font-size: .85rem; transition: color .15s; }
+.nav-links a:hover { color: var(--sub); }
+.github-link { color: var(--mauve) !important; }
 
-.char{color:var(--s1);}
-.char.correct{color:var(--green);}
-.char.wrong{color:var(--red);}
-.char.cursor{color:var(--text);border-bottom:2px solid var(--mauve);}
-/* Syntax highlight classes (pending chars) */
-.char.hl-keyword{color:var(--mauve);}
-.char.hl-builtin{color:var(--sky);}
-.char.hl-string{color:var(--green);}
-.char.hl-comment{color:var(--ov0);}
-.char.hl-number{color:var(--peach);}
-.char.hl-punct{color:var(--blue);}
+/* ── Main layout ─────────────────────────────────────────────────────────── */
+main {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2rem; padding: 2rem 1rem;
+  min-height: 0;
+}
 
-.stats{display:flex;gap:1.5rem;margin-top:1rem;font-size:.9rem;color:var(--ov0);flex-wrap:wrap;}
-.sv{font-weight:bold;}
-.sv.wpm{color:var(--yellow);}
-.sv.acc{color:var(--sky);}
-.sv.timer{color:var(--blue);}
-.sv.timer.warn{color:var(--red);}
-.hint{color:var(--s1);font-size:.7rem;margin-top:.3rem;}
-#hidden-input{position:fixed;left:-9999px;opacity:0;pointer-events:none;}
+/* ── Mode + option bar ───────────────────────────────────────────────────── */
+.control-bar { display: flex; flex-direction: column; align-items: center; gap: .6rem; }
+.pill-row { display: flex; gap: .25rem; }
+.pill {
+  background: transparent; border: none;
+  color: var(--s2); padding: .3rem .7rem;
+  border-radius: 6px; cursor: pointer;
+  font-family: var(--font-mono); font-size: .82rem;
+  transition: color .12s, background .12s;
+}
+.pill:hover { color: var(--sub); }
+.pill.active { background: var(--s0); color: var(--mauve); }
+.pill-sep { width: 1px; background: var(--s0); margin: .2rem .1rem; }
 
-/* ── WPM Chart ── */
-#chart-wrap{
-  width:min(720px,100%);display:none;
-  background:var(--mantle);border:1px solid var(--s0);
-  border-radius:8px;padding:.75rem 1rem .5rem;
-}
-#chart-wrap h3{font-size:.75rem;color:var(--ov0);margin-bottom:.5rem;font-weight:normal;}
-#wpm-chart{max-height:110px;}
+/* ── Typing container ────────────────────────────────────────────────────── */
+.typing-wrap { width: min(750px, 100%); }
 
-/* ── Keyboard heatmap ── */
-#heatmap-wrap{
-  width:min(720px,100%);display:none;
-  background:var(--mantle);border:1px solid var(--s0);
-  border-radius:8px;padding:.75rem 1rem;
+/* ── Live stats ──────────────────────────────────────────────────────────── */
+.live-stats {
+  display: flex; gap: 2rem; margin-bottom: 1.5rem;
+  font-family: var(--font-mono); font-size: .9rem; color: var(--s2);
+  min-height: 1.4rem;
 }
-#heatmap-wrap h3{font-size:.75rem;color:var(--ov0);margin-bottom:.6rem;font-weight:normal;}
-.kb-row{display:flex;gap:3px;margin-bottom:3px;}
-.key{
-  min-width:30px;height:30px;border-radius:4px;
-  background:var(--s0);color:var(--sub0);
-  display:flex;align-items:center;justify-content:center;
-  font-size:.65rem;border:1px solid var(--s1);
-  transition:background .3s;cursor:default;
-}
-.key.w15{min-width:46px;}.key.w2{min-width:60px;}.key.spc{min-width:190px;}
+.live-stats .val { font-weight: 600; }
+.live-stats .val.wpm   { color: var(--yellow); }
+.live-stats .val.acc   { color: var(--sky); }
+.live-stats .val.timer { color: var(--blue); }
+.live-stats .val.timer.warn { color: var(--red); }
 
-/* ── Results ── */
-#results{display:none;flex-direction:column;align-items:center;gap:1rem;}
-.result-card{
-  border:1px solid var(--s0);border-radius:10px;
-  padding:1.4rem 2.2rem;display:grid;
-  grid-template-columns:1fr 1fr;gap:.4rem 2.5rem;
+/* ── Attribution (quote author / snippet lang) ───────────────────────────── */
+.attr { font-size: .78rem; color: var(--s2); margin-bottom: .6rem; min-height: 1.1rem; font-family: var(--font-ui); }
+
+/* ── Progress bar ────────────────────────────────────────────────────────── */
+.progress-wrap { height: 2px; background: var(--s0); border-radius: 1px; margin-bottom: 1.2rem; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--mauve); border-radius: 1px; transition: width .1s linear; }
+
+/* ── Word display ────────────────────────────────────────────────────────── */
+#word-display {
+  font-family: var(--font-mono);
+  font-size: 1.4rem; line-height: 2.2rem;
+  height: calc(3 * 2.2rem);
+  overflow: hidden;
+  position: relative;
+  cursor: text;
+  user-select: none;
 }
-.rl{color:var(--ov0);font-size:.72rem;}
-.rv{font-size:1.4rem;font-weight:bold;}
-.rv.wpm{color:var(--yellow);}.rv.acc{color:var(--sky);}.rv.secs{color:var(--blue);}
-.pb-badge{
-  display:none;background:var(--yellow);color:var(--base);
-  font-size:.6rem;font-weight:bold;padding:.1rem .35rem;
-  border-radius:3px;margin-left:.35rem;vertical-align:middle;
+/* Prose: words as inline blocks */
+.word { display: inline-block; margin-right: .45em; }
+/* Code: each line as a block, preserve whitespace */
+.code-line { display: block; white-space: pre; }
+
+/* Character states */
+.ch { color: var(--s1); }
+.ch.ok    { color: var(--tx); opacity: .65; }
+.ch.err   { color: var(--red); }
+.ch.cur   { color: var(--tx); border-bottom: 2px solid var(--mauve); }
+/* Highlight.js-derived pending colors (applied before typing) */
+.ch.hl-k  { color: var(--mauve); }   /* keyword */
+.ch.hl-b  { color: var(--sky); }     /* builtin/type */
+.ch.hl-s  { color: var(--green); }   /* string */
+.ch.hl-c  { color: var(--ov); }      /* comment */
+.ch.hl-n  { color: var(--peach); }   /* number */
+.ch.hl-p  { color: var(--blue); }    /* punctuation */
+
+/* ── Hint bar ────────────────────────────────────────────────────────────── */
+.hint-bar {
+  margin-top: .75rem; font-size: .72rem; color: var(--s0);
+  font-family: var(--font-mono); letter-spacing: .03em;
 }
-.result-actions{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;}
-.result-actions .btn{padding:.4rem 1rem;}
+.hint-bar kbd {
+  color: var(--s2); background: none; border: none;
+  font-family: inherit; font-size: inherit;
+}
+
+/* ── Results ─────────────────────────────────────────────────────────────── */
+#results-panel {
+  display: none; flex-direction: column; align-items: center;
+  gap: 2rem; width: min(750px, 100%);
+}
+.big-stats {
+  display: flex; gap: 4rem; align-items: flex-end;
+}
+.stat-block { display: flex; flex-direction: column; gap: .15rem; }
+.stat-num {
+  font-family: var(--font-mono); font-size: 3.5rem; font-weight: 300;
+  line-height: 1;
+}
+.stat-num.wpm   { color: var(--yellow); }
+.stat-num.acc   { color: var(--sky); }
+.stat-num.secs  { color: var(--blue); }
+.stat-num.pb    { color: var(--s2); font-size: 2.2rem; }
+.stat-label { color: var(--s2); font-size: .78rem; font-family: var(--font-mono); }
+.pb-pill {
+  display: none; background: var(--yellow); color: var(--base);
+  font-size: .65rem; font-weight: 700; padding: .15rem .5rem;
+  border-radius: 20px; font-family: var(--font-mono); margin-left: .5rem;
+  vertical-align: middle;
+}
+.divider { width: 100%; height: 1px; background: var(--s0); }
+
+/* ── WPM chart ───────────────────────────────────────────────────────────── */
+.chart-wrap { width: 100%; }
+.section-label { font-size: .72rem; color: var(--s2); font-family: var(--font-mono); margin-bottom: .5rem; }
+#wpm-chart { max-height: 120px; }
+
+/* ── Keyboard heatmap ────────────────────────────────────────────────────── */
+.heatmap-wrap { width: 100%; }
+.kb { display: flex; flex-direction: column; gap: 3px; }
+.kb-row { display: flex; gap: 3px; }
+.key {
+  min-width: 34px; height: 34px; border-radius: 5px;
+  background: var(--s0); color: var(--s2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .65rem; font-family: var(--font-mono);
+  border: 1px solid var(--s1); transition: background .25s, color .25s;
+  cursor: default;
+}
+.key.w1h { min-width: 52px; }
+.key.w2  { min-width: 68px; }
+.key.spc { min-width: 220px; }
+
+/* ── Results actions ─────────────────────────────────────────────────────── */
+.result-actions { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
+.act-btn {
+  background: var(--s0); border: 1px solid var(--s1); color: var(--sub);
+  padding: .4rem 1.1rem; border-radius: 6px; cursor: pointer;
+  font-family: var(--font-mono); font-size: .82rem; transition: all .12s;
+}
+.act-btn:hover { background: var(--s1); color: var(--tx); }
+.act-btn.primary { background: var(--mauve); border-color: var(--mauve); color: var(--base); font-weight: 600; }
+.act-btn.primary:hover { filter: brightness(1.1); }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+footer {
+  text-align: center; padding: .75rem;
+  font-size: .72rem; color: var(--s1);
+  border-top: 1px solid var(--s0);
+}
+footer a { color: var(--s2); text-decoration: none; }
+footer a:hover { color: var(--mauve); }
+
+/* ── Hidden input trick ──────────────────────────────────────────────────── */
+#capture { position: fixed; left: -9999px; opacity: 0; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>typist</h1>
-  <div class="subtitle">offline · open source · no paywall</div>
-</header>
-
-<div id="controls">
-  <div class="btn-row" id="mode-btns">
-    <button class="btn active" data-mode="words">words</button>
-    <button class="btn"        data-mode="time">time</button>
-    <button class="btn"        data-mode="quote">quote</button>
-    <button class="btn"        data-mode="code">code</button>
+<nav>
+  <span class="nav-logo">typist</span>
+  <div class="nav-links">
+    <a href="#" class="nav-link" id="nav-tui">about</a>
+    <a href="https://github.com/chuma-beep/typist" target="_blank" class="github-link">github ↗</a>
   </div>
-  <div class="btn-row" id="sub-btns" style="display:none"></div>
-</div>
+</nav>
 
-<div id="typing-area">
-  <div id="attribution"></div>
-  <div id="word-display"></div>
-  <div class="stats">
-    <span><span class="sv wpm" id="st-wpm">0</span> wpm</span>
-    <span><span class="sv acc" id="st-acc">100</span>% acc</span>
-    <span id="timer-wrap" style="display:none"><span class="sv timer" id="st-timer">30</span>s</span>
+<main>
+
+  <!-- Mode + sub-option pills -->
+  <div class="control-bar">
+    <div class="pill-row" id="mode-row">
+      <button class="pill active" data-mode="words">words</button>
+      <div class="pill-sep"></div>
+      <button class="pill" data-mode="time">time</button>
+      <div class="pill-sep"></div>
+      <button class="pill" data-mode="quote">quote</button>
+      <div class="pill-sep"></div>
+      <button class="pill" data-mode="code">code</button>
+    </div>
+    <div class="pill-row" id="sub-row" style="display:none"></div>
   </div>
-  <div class="hint">ctrl+r restart &nbsp;·&nbsp; click to focus</div>
-</div>
 
-<div id="chart-wrap">
-  <h3>wpm over time</h3>
-  <canvas id="wpm-chart"></canvas>
-</div>
-
-<div id="heatmap-wrap">
-  <h3>mistake heatmap</h3>
-  <div id="keyboard"></div>
-</div>
-
-<div id="results">
-  <div class="result-card">
-    <div><div class="rl">wpm</div>
-      <div class="rv wpm" id="r-wpm">0<span class="pb-badge" id="pb-badge">PB</span></div></div>
-    <div><div class="rl">accuracy</div><div class="rv acc" id="r-acc">0%</div></div>
-    <div><div class="rl">time</div><div class="rv secs" id="r-time">0s</div></div>
-    <div><div class="rl">personal best</div><div class="rv" id="r-pb" style="color:var(--ov0)">—</div></div>
+  <!-- Typing area -->
+  <div class="typing-wrap" id="typing-panel">
+    <div class="live-stats" id="live-stats">
+      <span><span class="val wpm" id="s-wpm">–</span> wpm</span>
+      <span><span class="val acc" id="s-acc">–</span>% acc</span>
+      <span id="s-timer-wrap" style="display:none"><span class="val timer" id="s-timer">30</span>s</span>
+    </div>
+    <div class="attr" id="attr"></div>
+    <div class="progress-wrap"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+    <div id="word-display"></div>
+    <div class="hint-bar">
+      <kbd>tab</kbd> · <kbd>enter</kbd> · <kbd>ctrl+r</kbd> restart · <kbd>esc</kbd> new test
+    </div>
   </div>
-  <div class="result-actions">
-    <button class="btn active" id="btn-again">again</button>
-    <button class="btn" id="btn-menu">change mode</button>
-  </div>
-</div>
 
-<input id="hidden-input" autocomplete="off" autocorrect="off" spellcheck="false">
+  <!-- Results panel (hidden until test ends) -->
+  <div id="results-panel">
+    <div class="big-stats">
+      <div class="stat-block">
+        <div class="stat-num wpm" id="r-wpm">0<span class="pb-pill" id="pb-pill">PB</span></div>
+        <div class="stat-label">wpm</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num acc" id="r-acc">0%</div>
+        <div class="stat-label">accuracy</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num secs" id="r-time">0s</div>
+        <div class="stat-label">time</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num pb" id="r-pb">—</div>
+        <div class="stat-label">best</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="chart-wrap">
+      <div class="section-label">wpm over time</div>
+      <canvas id="wpm-chart"></canvas>
+    </div>
+
+    <div class="heatmap-wrap" id="heatmap-wrap" style="display:none">
+      <div class="section-label">mistake heatmap</div>
+      <div class="kb" id="keyboard"></div>
+    </div>
+
+    <div class="result-actions">
+      <button class="act-btn primary" id="btn-again">again</button>
+      <button class="act-btn" id="btn-new">new test</button>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  typist · open source · <a href="https://github.com/chuma-beep/typist">github.com/chuma-beep/typist</a>
+</footer>
+
+<input id="capture" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 
 <script>
-const $ = id => document.getElementById(id);
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA — embedded so the page is fully static (no server needed)
+// ═══════════════════════════════════════════════════════════════════════════
 
-// ── Config ──────────────────────────────────────────────────────────────────
-let mode = 'words', subOption = '';
-const subOptions = {
-  time: ['15s','30s','60s','120s'],
-  code: ['go','js','python','rust'],
-};
-const timeSecs = {'15s':15,'30s':30,'60s':60,'120s':120};
+const WORDS = ["the","be","to","of","and","a","in","that","have","it","for",
+"not","on","with","he","as","you","do","at","this","but","his","by","from",
+"they","we","say","her","she","or","an","will","my","one","all","would","there",
+"their","what","so","up","out","if","about","who","get","which","go","me","when",
+"make","can","like","time","no","just","him","know","take","people","into","year",
+"your","good","some","could","them","see","other","than","then","now","look",
+"only","come","its","over","think","also","back","after","use","two","how","our",
+"work","first","well","way","even","new","want","because","any","these","give",
+"day","most","us","great","between","need","large","often","hand","high","place",
+"hold","point","world","life","few","open","seem","together","next","white",
+"children","begin","got","walk","example","ease","paper","group","always","music",
+"those","both","mark","book","letter","until","mile","river","car","feet","care",
+"second","enough","plain","girl","young","ready","above","ever","red","list",
+"though","feel","talk","bird","soon","body","dog","family","direct","leave",
+"song","measure","door","product","black"];
 
-// ── State ───────────────────────────────────────────────────────────────────
-let targetText = '', serverKinds = []; // kinds from Chroma via /api/snippet
-let charEls = [];
-let inputIdx = 0, totalKeys = 0, errors = 0;
-let startTime = null, timerInterval = null, timeLeft = 30;
-let running = false, finished = false;
-let mistakeMap = {}, wpmHistory = [];
-let wpmChart = null, wpmInterval = null;
+const QUOTES = [
+  {text:"The only way to do great work is to love what you do.",author:"Steve Jobs"},
+  {text:"It was a bright cold day in April, and the clocks were striking thirteen.",author:"George Orwell"},
+  {text:"It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness.",author:"Charles Dickens"},
+  {text:"All happy families are alike; each unhappy family is unhappy in its own way.",author:"Leo Tolstoy"},
+  {text:"The sky above the port was the color of television, tuned to a dead channel.",author:"William Gibson"},
+  {text:"In three words I can sum up everything I've learned about life: it goes on.",author:"Robert Frost"},
+  {text:"If you tell the truth, you don't have to remember anything.",author:"Mark Twain"},
+  {text:"To live is the rarest thing in the world. Most people exist, that is all.",author:"Oscar Wilde"},
+  {text:"Without music, life would be a mistake.",author:"Friedrich Nietzsche"},
+  {text:"Programs must be written for people to read, and only incidentally for machines to execute.",author:"Harold Abelson"},
+  {text:"Any fool can write code that a computer can understand. Good programmers write code that humans can understand.",author:"Martin Fowler"},
+  {text:"First, solve the problem. Then, write the code.",author:"John Johnson"},
+  {text:"Code is like humor. When you have to explain it, it is bad.",author:"Cory House"},
+  {text:"Experience is the name everyone gives to their mistakes.",author:"Oscar Wilde"},
+  {text:"It does not do to dwell on dreams and forget to live.",author:"J.K. Rowling"},
+];
 
-// ── Sub-option row ──────────────────────────────────────────────────────────
-function buildSubBtns() {
-  const opts = subOptions[mode];
-  const wrap = $('sub-btns');
-  if (!opts) { wrap.style.display='none'; return; }
-  wrap.style.display = 'flex';
-  wrap.innerHTML = '';
-  opts.forEach((label, i) => {
-    const b = document.createElement('button');
-    b.className = 'btn' + (i===0 ? ' active' : '');
-    b.textContent = label;
-    b.onclick = () => {
-      wrap.querySelectorAll('.btn').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      subOption = label;
-      loadTest();
-    };
-    wrap.appendChild(b);
-  });
-  subOption = opts[0];
+const SNIPPETS = {
+  go: [
+`func fibonacci(n int) int {
+	if n <= 1 {
+		return n
+	}
+	return fibonacci(n-1) + fibonacci(n-2)
+}`,
+`func binarySearch(nums []int, target int) int {
+	lo, hi := 0, len(nums)-1
+	for lo <= hi {
+		mid := (lo + hi) / 2
+		if nums[mid] == target {
+			return mid
+		} else if nums[mid] < target {
+			lo = mid + 1
+		} else {
+			hi = mid - 1
+		}
+	}
+	return -1
+}`,
+`func wordCount(s string) map[string]int {
+	counts := make(map[string]int)
+	for _, word := range strings.Fields(s) {
+		counts[strings.ToLower(word)]++
+	}
+	return counts
+}`,
+`type Stack[T any] struct {
+	items []T
 }
 
-// ── Load test ───────────────────────────────────────────────────────────────
-async function loadTest() {
-  reset();
-  serverKinds = [];
+func (s *Stack[T]) Push(item T) {
+	s.items = append(s.items, item)
+}
 
-  if (mode === 'words') {
-    targetText = (await (await fetch('/api/words')).json()).text;
-    $('attribution').textContent = '';
-  } else if (mode === 'time') {
-    const d = await (await fetch('/api/words')).json();
-    targetText = d.text + ' ' + d.text;
-    $('attribution').textContent = '';
-  } else if (mode === 'quote') {
-    const q = await (await fetch('/api/quote')).json();
+func (s *Stack[T]) Pop() (T, bool) {
+	var zero T
+	if len(s.items) == 0 {
+		return zero, false
+	}
+	item := s.items[len(s.items)-1]
+	s.items = s.items[:len(s.items)-1]
+	return item, true
+}`,
+  ],
+  js: [
+`function debounce(fn, delay) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}`,
+`const deepClone = (obj) => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(deepClone);
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, deepClone(v)])
+  );
+};`,
+`function memoize(fn) {
+  const cache = new Map();
+  return function (...args) {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) return cache.get(key);
+    const result = fn.apply(this, args);
+    cache.set(key, result);
+    return result;
+  };
+}`,
+`async function fetchWithRetry(url, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(res.statusText);
+      return await res.json();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * 2 ** i));
+    }
+  }
+}`,
+  ],
+  python: [
+`def quicksort(arr):
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    mid = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    return quicksort(left) + mid + quicksort(right)`,
+`def flatten(nested, depth=None):
+    result = []
+    for item in nested:
+        if isinstance(item, list) and depth != 0:
+            result.extend(flatten(item, None if depth is None else depth - 1))
+        else:
+            result.append(item)
+    return result`,
+`class LRUCache:
+    def __init__(self, capacity):
+        self.cache = {}
+        self.capacity = capacity
+        self.order = []
+
+    def get(self, key):
+        if key not in self.cache:
+            return -1
+        self.order.remove(key)
+        self.order.append(key)
+        return self.cache[key]`,
+  ],
+  rust: [
+`fn binary_search<T: Ord>(arr: &[T], target: &T) -> Option<usize> {
+    let (mut lo, mut hi) = (0, arr.len());
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        match arr[mid].cmp(target) {
+            std::cmp::Ordering::Equal => return Some(mid),
+            std::cmp::Ordering::Less => lo = mid + 1,
+            std::cmp::Ordering::Greater => hi = mid,
+        }
+    }
+    None
+}`,
+`fn two_sum(nums: &[i32], target: i32) -> Option<(usize, usize)> {
+    let mut seen = std::collections::HashMap::new();
+    for (i, &n) in nums.iter().enumerate() {
+        if let Some(&j) = seen.get(&(target - n)) {
+            return Some((j, i));
+        }
+        seen.insert(n, i);
+    }
+    None
+}`,
+`fn word_count(text: &str) -> std::collections::HashMap<&str, usize> {
+    let mut counts = std::collections::HashMap::new();
+    for word in text.split_whitespace() {
+        *counts.entry(word).or_insert(0) += 1;
+    }
+    counts
+}`,
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HIGHLIGHT.JS TOKENIZER
+// Uses highlight.js to tokenize code then maps spans to per-char classes.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const HLJ_LANG = { go:'go', js:'javascript', python:'python', rust:'rust' };
+
+function tokenizeWithHLJS(code, lang) {
+  const hljsLang = HLJ_LANG[lang] || lang;
+  let html;
+  try { html = hljs.highlight(code, {language: hljsLang}).value; }
+  catch { return new Array([...code].length).fill(''); }
+
+  // Parse the HTML spans and map each original char to a class
+  const kinds = [];
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  function walk(node) {
+    if (node.nodeType === 3) {
+      // Text node — inherit parent class
+      const cls = node.parentElement?.className || '';
+      let kind = '';
+      if (cls.includes('keyword'))  kind = 'hl-k';
+      else if (cls.includes('built_in') || cls.includes('type')) kind = 'hl-b';
+      else if (cls.includes('string') || cls.includes('char')) kind = 'hl-s';
+      else if (cls.includes('comment')) kind = 'hl-c';
+      else if (cls.includes('number') || cls.includes('literal')) kind = 'hl-n';
+      else if (cls.includes('punct') || cls.includes('operator')) kind = 'hl-p';
+      for (const ch of node.textContent) kinds.push(kind);
+    } else {
+      for (const child of node.childNodes) walk(child);
+    }
+  }
+  for (const child of tmp.childNodes) walk(child);
+  return kinds;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCORES — persisted in localStorage
+// ═══════════════════════════════════════════════════════════════════════════
+
+function saveScore(entry) {
+  const scores = loadScores();
+  scores.push(entry);
+  scores.sort((a,b) => b.wpm - a.wpm);
+  localStorage.setItem('typist_scores', JSON.stringify(scores.slice(0, 500)));
+}
+
+function loadScores() {
+  try { return JSON.parse(localStorage.getItem('typist_scores') || '[]'); }
+  catch { return []; }
+}
+
+function personalBest(mode, lang, dur) {
+  return loadScores()
+    .filter(s => s.mode===mode && (s.lang||'')===(lang||'') && s.duration===dur)
+    .reduce((best, s) => Math.max(best, s.wpm), 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+
+let mode = 'words', subOpt = '';
+const subOptions = {
+  time: ['15','30','60','120'],
+  code: ['go','js','python','rust'],
+};
+const timeSecs = {'15':15,'30':30,'60':60,'120':120};
+
+let targetText = '', charKinds = [];
+let charEls = [];
+let inputIdx = 0, totalKeys = 0, errors = 0;
+let startTime = null, running = false, finished = false;
+let timeLeft = 30, timerIval = null, wpmIval = null;
+let mistakeMap = {}, wpmHistory = [];
+let wpmChart = null;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SUB-OPTION PILLS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildSubRow() {
+  const opts = subOptions[mode];
+  const row = document.getElementById('sub-row');
+  if (!opts) { row.style.display='none'; return; }
+  row.style.display = 'flex';
+  row.innerHTML = '';
+  opts.forEach((label, i) => {
+    if (i > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'pill-sep';
+      row.appendChild(sep);
+    }
+    const b = document.createElement('button');
+    b.className = 'pill' + (i===0 ? ' active' : '');
+    b.textContent = label;
+    b.onclick = () => {
+      row.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+      b.classList.add('active');
+      subOpt = label;
+      newTest();
+    };
+    row.appendChild(b);
+  });
+  subOpt = opts[0];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOAD TEST
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pick(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+
+function shuffle30() {
+  const out = [];
+  for (let i=0;i<30;i++) out.push(pick(WORDS));
+  return out.join(' ');
+}
+
+function newTest() {
+  reset();
+  charKinds = [];
+
+  if (mode==='words') {
+    targetText = shuffle30();
+    document.getElementById('attr').textContent = '';
+  } else if (mode==='time') {
+    // Generate ~200 words for the longest timer
+    const out = [];
+    for (let i=0;i<200;i++) out.push(pick(WORDS));
+    targetText = out.join(' ');
+    document.getElementById('attr').textContent = '';
+  } else if (mode==='quote') {
+    const q = pick(QUOTES);
     targetText = q.text;
-    $('attribution').textContent = '— ' + q.author;
-  } else if (mode === 'code') {
-    const lang = subOption || 'go';
-    const d = await (await fetch('/api/snippet?lang='+lang)).json();
-    targetText = d.code;
-    serverKinds = d.kinds || [];  // Chroma token kinds, one per rune
-    $('attribution').textContent = lang + ' snippet';
+    document.getElementById('attr').textContent = '— ' + q.author;
+  } else {
+    const lang = subOpt || 'go';
+    targetText = pick(SNIPPETS[lang] || SNIPPETS.go);
+    charKinds = tokenizeWithHLJS(targetText, lang);
+    document.getElementById('attr').textContent = lang + ' snippet';
   }
 
   buildDisplay();
-  focusInput();
+  focus();
 }
 
-function reset() {
-  clearInterval(timerInterval); clearInterval(wpmInterval);
-  timerInterval = null; wpmInterval = null;
-  startTime = null; inputIdx = 0; totalKeys = 0; errors = 0;
-  mistakeMap = {}; wpmHistory = [];
-  timeLeft = timeSecs[subOption] || 30;
-  running = false; finished = false;
-  $('hidden-input').value = '';
-  $('st-wpm').textContent = '0'; $('st-acc').textContent = '100';
-  $('st-timer').textContent = timeLeft; $('st-timer').classList.remove('warn');
-  $('results').style.display = 'none';
-  $('chart-wrap').style.display = 'none';
-  $('heatmap-wrap').style.display = 'none';
-  $('typing-area').style.display = '';
-  $('controls').style.display = '';
-  if (wpmChart) { wpmChart.destroy(); wpmChart = null; }
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// DISPLAY BUILDER
+// ═══════════════════════════════════════════════════════════════════════════
 
-// ── Display builder ─────────────────────────────────────────────────────────
 function buildDisplay() {
-  const display = $('word-display');
+  const display = document.getElementById('word-display');
   display.innerHTML = ''; charEls = [];
 
   if (mode === 'code') {
@@ -265,164 +632,148 @@ function buildDisplay() {
     buildProseDisplay(display);
   }
 
-  if (charEls.length > 0) charEls[0].classList.add('cursor');
+  if (charEls.length > 0) charEls[0].classList.add('cur');
 }
 
-// Code display: one <div class="code-line"> per line, preserving indentation.
-// Newlines are shown as ↵ and must be typed (Enter key).
 function buildCodeDisplay(display) {
-  const lines = targetText.split(/(?<=\n)/g); // split after each \n, keep \n
-  let absPos = 0;
+  const lines = targetText.split(/(?<=\n)/g);
+  let abs = 0;
   lines.forEach(line => {
     const lineEl = document.createElement('div');
     lineEl.className = 'code-line';
     for (const ch of line) {
-      const span = document.createElement('span');
-      span.className = 'char';
-      span.dataset.ch = ch;
-      // Apply Chroma kind from server
-      if (serverKinds.length > absPos && serverKinds[absPos] !== 'normal') {
-        span.classList.add('hl-' + serverKinds[absPos]);
-      }
-      if (ch === '\n') {
-        span.textContent = '↵';
-      } else if (ch === '\t') {
-        span.textContent = '    '; // 4-space tab display
-        span.style.display = 'inline-block';
-        span.style.width = '2.4rem';
-      } else {
-        span.textContent = ch;
-      }
-      lineEl.appendChild(span);
-      charEls.push(span);
-      absPos++;
+      const sp = makeCharEl(ch, abs);
+      lineEl.appendChild(sp);
+      charEls.push(sp);
+      abs++;
     }
     display.appendChild(lineEl);
   });
 }
 
-// Prose display: words as inline-block divs, characters as spans.
 function buildProseDisplay(display) {
   const words = targetText.split(' ');
-  let absPos = 0;
+  let abs = 0;
   words.forEach((word, wi) => {
-    const wordEl = document.createElement('div');
-    wordEl.className = 'word';
+    const wEl = document.createElement('div');
+    wEl.className = 'word';
     for (const ch of word) {
-      const span = document.createElement('span');
-      span.className = 'char';
-      span.dataset.ch = ch;
-      span.textContent = ch;
-      wordEl.appendChild(span);
-      charEls.push(span);
-      absPos++;
+      const sp = makeCharEl(ch, abs);
+      wEl.appendChild(sp); charEls.push(sp); abs++;
     }
-    if (wi < words.length - 1) {
-      const sp = document.createElement('span');
-      sp.className = 'char'; sp.dataset.ch = ' '; sp.textContent = ' ';
-      wordEl.appendChild(sp);
-      charEls.push(sp);
-      absPos++;
+    if (wi < words.length-1) {
+      const sp = makeCharEl(' ', abs);
+      wEl.appendChild(sp); charEls.push(sp); abs++;
     }
-    display.appendChild(wordEl);
+    display.appendChild(wEl);
   });
 }
 
-// ── Input handling ──────────────────────────────────────────────────────────
-$('hidden-input').addEventListener('keydown', e => {
+function makeCharEl(ch, absPos) {
+  const sp = document.createElement('span');
+  sp.className = 'ch';
+  sp.dataset.ch = ch;
+  if (charKinds.length > absPos && charKinds[absPos]) {
+    sp.classList.add(charKinds[absPos]);
+  }
+  if (ch === '\n') { sp.textContent = '↵'; }
+  else if (ch === '\t') {
+    sp.textContent = '    ';
+    sp.style.display = 'inline-block'; sp.style.width = '2.8rem';
+  } else {
+    sp.textContent = ch;
+  }
+  return sp;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INPUT
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.getElementById('capture').addEventListener('keydown', e => {
   if (finished) return;
-  if (e.ctrlKey && e.key === 'r') { e.preventDefault(); loadTest(); return; }
-  if (e.key === 'Backspace') { e.preventDefault(); handleBackspace(); return; }
-  if (e.key === 'Tab') { e.preventDefault(); handleChar('\t'); return; }
-  if (e.key === 'Enter' && mode === 'code') { e.preventDefault(); handleChar('\n'); return; }
+  if (e.ctrlKey && e.key==='r') { e.preventDefault(); newTest(); return; }
+  if (e.key==='Escape') { newTest(); return; }
+  if (e.key==='Backspace') { e.preventDefault(); backspace(); return; }
+  if (e.key==='Tab') { e.preventDefault(); handleChar('\t'); return; }
+  if (e.key==='Enter' && mode==='code') { e.preventDefault(); handleChar('\n'); return; }
 });
 
-$('hidden-input').addEventListener('input', e => {
+document.getElementById('capture').addEventListener('input', e => {
   if (finished) return;
-  const val = $('hidden-input').value;
-  if (!val) return;
-  const ch = val[val.length-1];
-  $('hidden-input').value = '';
+  const v = e.target.value;
+  if (!v) return;
+  const ch = v[v.length-1];
+  e.target.value = '';
   handleChar(ch);
 });
 
 function handleChar(ch) {
   if (inputIdx >= charEls.length) return;
-  if (!running) startTest();
+  if (!running) start();
 
   const expected = charEls[inputIdx].dataset.ch;
   totalKeys++;
-  if (ch !== expected) {
+  const correct = ch === expected;
+  if (!correct) {
     errors++;
-    const disp = expected === '\n' ? 'enter' : expected === '\t' ? 'tab' : expected;
-    mistakeMap[disp] = (mistakeMap[disp]||0) + 1;
+    const label = expected==='\n'?'enter':expected==='\t'?'tab':expected===' '?'space':expected;
+    mistakeMap[label] = (mistakeMap[label]||0) + 1;
   }
 
   const el = charEls[inputIdx];
-  el.classList.remove('cursor');
-  // Remove syntax highlight class — it's been typed now
-  el.classList.remove('hl-keyword','hl-builtin','hl-string','hl-comment','hl-number','hl-punct');
-  el.classList.add(ch === expected ? 'correct' : 'wrong');
-
+  el.classList.remove('cur','hl-k','hl-b','hl-s','hl-c','hl-n','hl-p');
+  el.classList.add(correct ? 'ok' : 'err');
   inputIdx++;
-  scrollIfNeeded();
-  if (inputIdx < charEls.length) charEls[inputIdx].classList.add('cursor');
-  if (mode !== 'time' && inputIdx >= charEls.length) endTest();
+  updateProgress();
+  scrollView();
+  if (inputIdx < charEls.length) charEls[inputIdx].classList.add('cur');
+  if (mode!=='time' && inputIdx>=charEls.length) endTest();
   updateStats();
 }
 
-function handleBackspace() {
-  if (inputIdx === 0) return;
+function backspace() {
+  if (inputIdx===0) return;
   inputIdx--;
   const el = charEls[inputIdx];
-  el.classList.remove('correct','wrong');
-  // Restore syntax highlight class if applicable
-  if (serverKinds.length > inputIdx && serverKinds[inputIdx] !== 'normal') {
-    el.classList.add('hl-' + serverKinds[inputIdx]);
-  }
-  el.classList.add('cursor');
-  if (charEls[inputIdx+1]) charEls[inputIdx+1].classList.remove('cursor');
-  scrollIfNeeded();
+  el.classList.remove('ok','err','cur');
+  // Restore syntax class
+  if (charKinds.length > inputIdx && charKinds[inputIdx]) el.classList.add(charKinds[inputIdx]);
+  el.classList.add('cur');
+  if (charEls[inputIdx+1]) charEls[inputIdx+1].classList.remove('cur');
+  updateProgress();
   updateStats();
 }
 
-function scrollIfNeeded() {
-  const display = $('word-display');
+function scrollView() {
+  const display = document.getElementById('word-display');
   const el = charEls[Math.min(inputIdx, charEls.length-1)];
-  const lh = parseFloat(getComputedStyle(display).lineHeight) || 30;
-  const top = (mode === 'code') ? el.parentElement.offsetTop : el.parentElement.offsetTop;
+  const parent = mode==='code' ? el.parentElement : el.parentElement;
+  const lh = parseFloat(getComputedStyle(display).lineHeight) || 35;
+  const top = parent.offsetTop;
   if (top + lh > display.scrollTop + display.clientHeight)
-    display.scrollTop = top + lh - display.clientHeight + lh * .5;
+    display.scrollTop = top + lh - display.clientHeight + lh * .4;
 }
 
-// ── Timers & stats ──────────────────────────────────────────────────────────
-function startTest() {
-  running = true; startTime = Date.now();
-  if (mode === 'time') {
-    $('timer-wrap').style.display = '';
-    timerInterval = setInterval(() => {
-      timeLeft--;
-      $('st-timer').textContent = timeLeft;
-      if (timeLeft <= 10) $('st-timer').classList.add('warn');
-      if (timeLeft <= 0) endTest();
-    }, 1000);
-  }
-  wpmInterval = setInterval(() => {
-    wpmHistory.push({t: (Date.now()-startTime)/1000, wpm: calcWPM()});
-    updateStats();
-  }, 1000);
+// ═══════════════════════════════════════════════════════════════════════════
+// PROGRESS + STATS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateProgress() {
+  const pct = charEls.length ? (inputIdx / charEls.length * 100) : 0;
+  document.getElementById('prog').style.width = pct + '%';
 }
 
 function updateStats() {
-  $('st-wpm').textContent = Math.round(calcWPM());
-  $('st-acc').textContent  = Math.round(calcAcc());
+  document.getElementById('s-wpm').textContent = Math.round(calcWPM());
+  document.getElementById('s-acc').textContent = Math.round(calcAcc());
 }
 
 function calcWPM() {
   if (!startTime) return 0;
   const mins = (Date.now()-startTime)/60000;
   if (!mins) return 0;
-  const correct = charEls.slice(0,inputIdx).filter(e=>e.classList.contains('correct')).length;
+  const correct = charEls.slice(0,inputIdx).filter(e=>e.classList.contains('ok')).length;
   return correct/5/mins;
 }
 
@@ -430,68 +781,115 @@ function calcAcc() {
   return totalKeys ? (totalKeys-errors)/totalKeys*100 : 100;
 }
 
-// ── End test ────────────────────────────────────────────────────────────────
-async function endTest() {
-  clearInterval(timerInterval); clearInterval(wpmInterval);
+// ═══════════════════════════════════════════════════════════════════════════
+// START / END
+// ═══════════════════════════════════════════════════════════════════════════
+
+function start() {
+  running = true; startTime = Date.now();
+  if (mode==='time') {
+    document.getElementById('s-timer-wrap').style.display='';
+    document.getElementById('s-timer').textContent = timeLeft;
+    timerIval = setInterval(()=>{
+      timeLeft--;
+      const el = document.getElementById('s-timer');
+      el.textContent = timeLeft;
+      el.classList.toggle('warn', timeLeft<=10);
+      if (timeLeft<=0) endTest();
+    }, 1000);
+  }
+  wpmIval = setInterval(()=>{
+    wpmHistory.push({t:(Date.now()-startTime)/1000, wpm:calcWPM()});
+    updateStats();
+  }, 1000);
+}
+
+function endTest() {
+  clearInterval(timerIval); clearInterval(wpmIval);
   finished = true;
   const elapsed = (Date.now()-startTime)/1000;
   const wpm = Math.round(calcWPM());
-  const acc = calcAcc().toFixed(1);
-  wpmHistory.push({t: elapsed, wpm});
+  const acc = parseFloat(calcAcc().toFixed(1));
+  wpmHistory.push({t:elapsed, wpm});
 
-  const lang = mode==='code' ? (subOption||'go') : '';
-  const dur  = mode==='time' ? (timeSecs[subOption]||30) : 0;
-  await fetch('/api/score', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({wpm, accuracy:parseFloat(acc), mode, lang, duration_seconds:dur, at:new Date().toISOString()})
-  });
+  const lang = mode==='code'?(subOpt||'go'):'';
+  const dur  = mode==='time'?(timeSecs[subOpt]||30):0;
 
-  const scores = await (await fetch('/api/scores')).json();
-  const filtered = (scores||[]).filter(s=>s.mode===mode && s.duration_seconds===dur && s.lang===lang);
-  const pb = filtered.length ? Math.max(...filtered.map(s=>s.wpm)) : wpm;
+  saveScore({wpm, accuracy:acc, mode, lang, duration:dur, at:new Date().toISOString()});
+  const pb = personalBest(mode, lang, dur);
 
-  $('typing-area').style.display = 'none';
-  $('controls').style.display    = 'none';
-  $('results').style.display     = 'flex';
+  // Switch panels
+  document.getElementById('typing-panel').style.display = 'none';
+  document.getElementById('results-panel').style.display = 'flex';
 
-  $('r-wpm').childNodes[0].textContent = wpm;
-  $('r-acc').textContent  = acc+'%';
-  $('r-time').textContent = elapsed.toFixed(1)+'s';
-  $('r-pb').textContent   = pb+' wpm';
-  $('pb-badge').style.display = wpm>=pb ? 'inline' : 'none';
+  document.getElementById('r-wpm').childNodes[0].textContent = wpm;
+  document.getElementById('r-acc').textContent = acc+'%';
+  document.getElementById('r-time').textContent = elapsed.toFixed(1)+'s';
+  document.getElementById('r-pb').textContent = pb ? pb+' wpm' : '—';
+  document.getElementById('pb-pill').style.display = wpm>=pb&&pb>0 ? 'inline':'none';
 
-  renderWPMChart();
+  renderChart();
   if (Object.keys(mistakeMap).length > 0) renderHeatmap();
 }
 
-// ── WPM Chart (Chart.js) ────────────────────────────────────────────────────
-function renderWPMChart() {
+// ═══════════════════════════════════════════════════════════════════════════
+// RESET
+// ═══════════════════════════════════════════════════════════════════════════
+
+function reset() {
+  clearInterval(timerIval); clearInterval(wpmIval);
+  timerIval=null; wpmIval=null; startTime=null;
+  inputIdx=0; totalKeys=0; errors=0;
+  mistakeMap={}; wpmHistory=[];
+  timeLeft = timeSecs[subOpt]||30;
+  running=false; finished=false;
+  document.getElementById('capture').value='';
+  document.getElementById('s-wpm').textContent='–';
+  document.getElementById('s-acc').textContent='–';
+  document.getElementById('s-timer').textContent=timeLeft;
+  document.getElementById('s-timer').classList.remove('warn');
+  document.getElementById('s-timer-wrap').style.display='none';
+  document.getElementById('prog').style.width='0%';
+  document.getElementById('typing-panel').style.display='';
+  document.getElementById('results-panel').style.display='none';
+  document.getElementById('heatmap-wrap').style.display='none';
+  document.getElementById('attr').textContent='';
+  if (wpmChart){wpmChart.destroy();wpmChart=null;}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WPM CHART
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderChart() {
   if (wpmHistory.length < 2) return;
-  $('chart-wrap').style.display = 'block';
-  wpmChart = new Chart($('wpm-chart'), {
-    type: 'line',
-    data: {
+  wpmChart = new Chart(document.getElementById('wpm-chart'), {
+    type:'line',
+    data:{
       labels: wpmHistory.map(p=>p.t.toFixed(0)+'s'),
       datasets:[{
         data: wpmHistory.map(p=>p.wpm),
-        borderColor:'#cba6f7', backgroundColor:'rgba(203,166,247,.1)',
+        borderColor:'#cba6f7', backgroundColor:'rgba(203,166,247,.08)',
         borderWidth:2, pointRadius:2, pointBackgroundColor:'#cba6f7',
-        tension:.35, fill:true,
+        tension:.4, fill:true,
       }]
     },
     options:{
-      responsive:true,
-      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(0)+' wpm'}} },
+      responsive:true, animation:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(0)+' wpm'}}},
       scales:{
-        x:{ticks:{color:'#585b70',font:{size:10}}, grid:{color:'#313244'}},
-        y:{ticks:{color:'#585b70',font:{size:10}}, grid:{color:'#313244'}, beginAtZero:true}
+        x:{ticks:{color:'#585b70',font:{size:10,family:'monospace'}}, grid:{color:'#313244'}},
+        y:{ticks:{color:'#585b70',font:{size:10,family:'monospace'}}, grid:{color:'#313244'}, beginAtZero:true}
       }
     }
   });
 }
 
-// ── Keyboard heatmap ────────────────────────────────────────────────────────
-const kbRows = [
+// ═══════════════════════════════════════════════════════════════════════════
+// KEYBOARD HEATMAP
+// ═══════════════════════════════════════════════════════════════════════════
+
+const KB = [
   ['`','1','2','3','4','5','6','7','8','9','0','-','='],
   ['q','w','e','r','t','y','u','i','o','p','[',']','\\'],
   ['a','s','d','f','g','h','j','k','l',';',"'"],
@@ -499,80 +897,67 @@ const kbRows = [
 ];
 
 function renderHeatmap() {
-  $('heatmap-wrap').style.display = 'block';
-  const kb = $('keyboard');
-  kb.innerHTML = '';
-  const maxCount = Math.max(...Object.values(mistakeMap), 1);
+  document.getElementById('heatmap-wrap').style.display='';
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML='';
+  const max = Math.max(...Object.values(mistakeMap), 1);
 
   const makeKey = (label, mapKey) => {
     const el = document.createElement('div');
-    el.className = 'key' + (label==='\\' ? ' w15' : label==='enter' ? ' w2' : label==='tab' ? ' w15' : '');
+    el.className = 'key' + (label==='enter'||label==='tab'?' w1h': label==='space'?' spc':'');
     el.textContent = label;
-    const count = mistakeMap[mapKey||label] || 0;
-    if (count > 0) {
-      const h = count/maxCount;
-      const r = Math.round(69  + (243-69)  * h);
-      const g = Math.round(71  + (139-71)  * h);
-      const b = Math.round(90  + (168-90)  * h);
-      el.style.background = `rgb(${r},${g},${b})`;
-      el.style.color = h>.5 ? '#1e1e2e' : '#cdd6f4';
-      el.style.borderColor = `rgb(${r},${g},${b})`;
-      el.title = `${label}: ${count} mistake${count>1?'s':''}`;
+    const n = mistakeMap[mapKey??label]||0;
+    if (n>0){
+      const h=n/max;
+      const r=Math.round(69+(243-69)*h), g=Math.round(71+(139-71)*h), b=Math.round(90+(168-90)*h);
+      el.style.background=`rgb(${r},${g},${b})`;
+      el.style.color=h>.5?'#1e1e2e':'#cdd6f4';
+      el.style.borderColor=`rgb(${r},${g},${b})`;
+      el.title=`${label}: ${n}×`;
     }
     return el;
   };
 
-  kbRows.forEach((row, ri) => {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'kb-row';
-    if (ri===0) rowEl.appendChild(makeKey('tab','tab'));
-    row.forEach(k => rowEl.appendChild(makeKey(k)));
-    if (ri===0) rowEl.appendChild(makeKey('bksp', ''));
-    if (ri===2) rowEl.appendChild(makeKey('enter','enter'));
+  KB.forEach((row,ri)=>{
+    const rowEl=document.createElement('div');
+    rowEl.className='kb-row';
+    if(ri===0) rowEl.appendChild(makeKey('tab','tab'));
+    row.forEach(k=>rowEl.appendChild(makeKey(k)));
+    if(ri===0) rowEl.appendChild(makeKey('bksp',''));
+    if(ri===2) rowEl.appendChild(makeKey('enter','enter'));
     kb.appendChild(rowEl);
   });
-  // Space row
-  const spRow = document.createElement('div');
-  spRow.className = 'kb-row';
-  const spEl = document.createElement('div');
-  spEl.className = 'key spc';
-  spEl.textContent = 'space';
-  const spCount = mistakeMap[' '] || 0;
-  if (spCount>0){
-    const h=spCount/maxCount;
-    const r=Math.round(69+(243-69)*h), g=Math.round(71+(139-71)*h), b=Math.round(90+(168-90)*h);
-    spEl.style.background=`rgb(${r},${g},${b})`;
-    spEl.style.color=h>.5?'#1e1e2e':'#cdd6f4';
-    spEl.title=`space: ${spCount} mistake${spCount>1?'s':''}`;
-  }
-  spRow.appendChild(spEl);
+  const spRow=document.createElement('div');
+  spRow.className='kb-row';
+  spRow.appendChild(makeKey('space','space'));
   kb.appendChild(spRow);
 }
 
-// ── Button wiring ───────────────────────────────────────────────────────────
-$('mode-btns').querySelectorAll('.btn').forEach(btn => {
-  btn.onclick = () => {
-    $('mode-btns').querySelectorAll('.btn').forEach(b=>b.classList.remove('active'));
+// ═══════════════════════════════════════════════════════════════════════════
+// WIRING
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.getElementById('mode-row').querySelectorAll('.pill').forEach(btn=>{
+  btn.onclick=()=>{
+    document.getElementById('mode-row').querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
-    mode = btn.dataset.mode;
-    subOption = '';
-    buildSubBtns();
-    loadTest();
+    mode=btn.dataset.mode; subOpt='';
+    buildSubRow(); newTest();
   };
 });
 
-$('btn-again').onclick = loadTest;
-$('btn-menu').onclick = () => { reset(); $('typing-area').style.display=''; $('controls').style.display=''; loadTest(); };
-$('word-display').onclick = focusInput;
-document.addEventListener('keydown', e => {
-  if (e.ctrlKey && e.key==='r') { e.preventDefault(); loadTest(); }
-  if (!finished) focusInput();
+document.getElementById('btn-again').onclick = newTest;
+document.getElementById('btn-new').onclick = ()=>{ newTest(); };
+document.getElementById('word-display').onclick = focus;
+document.addEventListener('keydown', e=>{
+  if(e.ctrlKey&&e.key==='r'){e.preventDefault();newTest();}
+  if(!finished) focus();
 });
 
-function focusInput() { $('hidden-input').focus(); }
+function focus(){ document.getElementById('capture').focus(); }
 
-buildSubBtns();
-loadTest();
+buildSubRow();
+newTest();
 </script>
 </body>
 </html>
