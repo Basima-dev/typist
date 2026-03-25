@@ -1,4 +1,3 @@
-Here's your README ready to copy & paste:
 
 ---
 
@@ -316,4 +315,3 @@ Made with ⚡ by [chuma-beep](https://github.com/chuma-beep)
 
 ---
 
-Just click the copy button in the top-right of the code block, or triple-click to select all and copy! 🚀
