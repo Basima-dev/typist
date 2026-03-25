@@ -119,8 +119,6 @@ type Model struct {
 	isPB      bool
 	exportMsg string
 
-	confirmQuit bool
-
 	// pre-computed token kinds for syntax highlighting
 	// per-rune Chroma styles (code mode only)
 	hlMap StyleMap
@@ -469,10 +467,8 @@ func (m Model) updateHistory(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		max = 0
 	}
 	switch msg.Type {
-	case tea.KeyCtrlC:
-		return m, tea.Quit
-	case tea.KeyEsc:
-		m.state = stateMenu
+	case tea.KeyCtrlC, tea.KeyEsc:
+		m.state = stateConfirm
 		return m, nil
 	case tea.KeyDown:
 		if m.histOffset < max {
@@ -511,12 +507,23 @@ func (m Model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "n", "N":
 			m.state = stateMenu
-			m.confirmQuit = false
 		default:
 			return m, nil
 		}
 	}
 	return m, nil
+}
+
+func (m Model) viewConfirm() string {
+	body := lipgloss.JoinVertical(lipgloss.Center,
+		titleStyle.Render("quit?"),
+		"",
+		subtleStyle.Render("any progress will be lost"),
+		"",
+		hintStyle.Render("enter / y / q")+subtleStyle.Render("  quit"),
+		hintStyle.Render("esc / n")+subtleStyle.Render("       cancel"),
+	)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
 
 // ── Metrics ───────────────────────────────────────────────────────────────────
@@ -570,11 +577,22 @@ func (m Model) View() string {
 // ── Menu view ─────────────────────────────────────────────────────────────────
 
 func (m Model) viewMenu() string {
-	// Logo
-	logo := titleStyle.Render("typist")
-	tagline := subtleStyle.Render("offline · open source · no paywall")
+	// Logo — double border for visual weight
+	logo := lipgloss.NewStyle().
+		Foreground(activeTheme.mauve).Bold(true).
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(activeTheme.surface1).
+		Padding(0, 2).
+		Render("typist")
 
-	// Mode pills — monkeytype style: all on one row, selected is bright
+	tagline := lipgloss.NewStyle().Foreground(activeTheme.overlay0).
+		Render("offline · open source · no paywall")
+
+	// Section label
+	sectionLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2).
+		Render("select mode")
+
+	// Mode pills
 	var modeBtns []string
 	for i, label := range modeNames {
 		if i == int(m.mode) {
@@ -585,36 +603,32 @@ func (m Model) viewMenu() string {
 	}
 	modeRow := lipgloss.JoinHorizontal(lipgloss.Center, modeBtns...)
 
-	// Sub-options (time durations or language picker) — dimmer row below
+	// Sub-option row
 	var subRow string
-	switch m.mode {
-	case modeTime:
+	buildSubBtns := func(labels []string, activeIdx, focusRow int) string {
 		var btns []string
-		for i, t := range timeLimits {
-			label := fmt.Sprintf("%d", t)
+		for i, label := range labels {
 			s := optionStyle
-			if i == m.timeLimitIdx {
-				s = dimSelectedStyle
-				if m.menuRow == 1 {
+			if i == activeIdx {
+				if focusRow == 1 && m.menuRow == 1 {
 					s = selectedStyle
+				} else {
+					s = dimSelectedStyle
 				}
 			}
 			btns = append(btns, s.Render(label))
 		}
-		subRow = "\n" + lipgloss.JoinHorizontal(lipgloss.Center, btns...)
-	case modeCode:
-		var btns []string
-		for i, lang := range langKeys {
-			s := optionStyle
-			if i == m.langIdx {
-				s = dimSelectedStyle
-				if m.menuRow == 1 {
-					s = selectedStyle
-				}
-			}
-			btns = append(btns, s.Render(lang))
+		return lipgloss.JoinHorizontal(lipgloss.Center, btns...)
+	}
+	switch m.mode {
+	case modeTime:
+		labels := make([]string, len(timeLimits))
+		for i, t := range timeLimits {
+			labels[i] = fmt.Sprintf("%ds", t)
 		}
-		subRow = "\n" + lipgloss.JoinHorizontal(lipgloss.Center, btns...)
+		subRow = "\n" + buildSubBtns(labels, m.timeLimitIdx, 1)
+	case modeCode:
+		subRow = "\n" + buildSubBtns(langKeys, m.langIdx, 1)
 	}
 
 	var hint string
@@ -624,15 +638,18 @@ func (m Model) viewMenu() string {
 		hint = hintStyle.Render("← →  mode   enter  start   esc  quit")
 	}
 
+	// Theme indicator
+	themeLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2).
+		Render(fmt.Sprintf("ctrl+t  theme: %s", func() string {
+			if isDark() {
+				return "mocha"
+			}
+			return "latte"
+		}()))
+
 	body := lipgloss.JoinVertical(lipgloss.Center,
-		logo,
-		tagline,
-		"",
-		"",
-		modeRow+subRow,
-		"",
-		"",
-		hint,
+		logo, "", tagline, "", "", sectionLabel, "",
+		modeRow+subRow, "", "", hint, "", themeLabel,
 	)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
@@ -672,26 +689,33 @@ func (m Model) viewTyping() string {
 				typed := m.input[absPos]
 				correct := typed == ch
 				if m.blindMode {
+					// Blind mode: neutral dot for correct, X for wrong
 					if correct {
-						sb.WriteString(correctStyle.Render("·"))
+						sb.WriteString(lipgloss.NewStyle().Foreground(activeTheme.surface2).Render("·"))
 					} else {
-						sb.WriteString(incorrectStyle.Render("·"))
+						sb.WriteString(lipgloss.NewStyle().Foreground(activeTheme.wrong).Render("✗"))
 					}
 				} else {
 					if correct {
-						sb.WriteString(correctStyle.Render(display))
+						// Dim the correct chars slightly — monkeytype feel
+						sb.WriteString(lipgloss.NewStyle().Foreground(activeTheme.subtext1).Render(display))
 					} else {
+						// Red bg on wrong chars, show what was typed
 						d := string(typed)
 						if ch == ' ' || ch == '\t' || ch == '\n' {
 							d = "·"
 						}
-						sb.WriteString(incorrectStyle.Render(d))
+						sb.WriteString(lipgloss.NewStyle().
+							Foreground(activeTheme.wrong).
+							Background(activeTheme.heatBg4).
+							Render(d))
 					}
 				}
 			} else if absPos == cursorPos {
+				// Solid block cursor — background colour, not underline
 				sb.WriteString(cursorStyle.Render(display))
 			} else {
-				// Pending — apply syntax highlighting in code mode
+				// Pending text
 				if m.mode == modeCode && m.hlMap != nil {
 					sb.WriteString(m.pendingWithHL(absPos, display))
 				} else {
@@ -767,45 +791,50 @@ func (m Model) pendingWithHL(pos int, display string) string {
 // ── Results view ──────────────────────────────────────────────────────────────
 
 func (m Model) viewResults() string {
-	header := titleStyle.Render("results")
+	dur := 0
+	if m.mode == modeTime {
+		dur = timeLimits[m.timeLimitIdx]
+	}
+	pb := personalBest(m.modeKey(), m.langKey(), dur)
+
+	// ── Stat blocks: big number + small label below ───────────────────────
+	// Use a large bold style for the numbers to give visual weight.
+	numStyle := lipgloss.NewStyle().Bold(true)
+
+	wpmNum := numStyle.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM))
+	accNum := numStyle.Foreground(activeTheme.acc).Render(fmt.Sprintf("%.1f%%", m.finalAcc))
+	timeNum := numStyle.Foreground(activeTheme.timer).Render(fmt.Sprintf("%.1fs", m.elapsed.Seconds()))
+	pbNum := numStyle.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", pb))
 
 	pbBadge := ""
 	if m.isPB {
-		pbBadge = pbStyle.Render("  new best! ")
+		pbBadge = "  " + pbStyle.Render(" new best! ")
 	}
 
-	bigWPM := lipgloss.NewStyle().
-		Foreground(activeTheme.wpm).
-		Bold(true).
-		Width(20).
-		Render(fmt.Sprintf("%.0f", m.finalWPM))
+	colW := 12
+	wpmCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, wpmNum+pbBadge, subtleStyle.Render("wpm")))
+	accCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, accNum, subtleStyle.Render("acc")))
+	timeCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, timeNum, subtleStyle.Render("time")))
+	pbCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, pbNum, subtleStyle.Render("best")))
 
-	bigAcc := lipgloss.NewStyle().
-		Foreground(activeTheme.acc).
-		Bold(true).
-		Width(12).
-		Render(fmt.Sprintf("%.1f%%", m.finalAcc))
+	statsRow := lipgloss.JoinHorizontal(lipgloss.Bottom, wpmCol, accCol, timeCol, pbCol)
 
-	bigTime := lipgloss.NewStyle().
-		Foreground(activeTheme.timer).
-		Bold(true).
-		Width(12).
-		Render(fmt.Sprintf("%.1fs", m.elapsed.Seconds()))
-
-	statsLine := lipgloss.JoinHorizontal(lipgloss.Bottom,
-		bigWPM+pbBadge,
-		bigAcc+subtleStyle.Render("  acc"),
-		bigTime+subtleStyle.Render("  time"),
-	)
-
-	divW := 50
+	// ── Divider ───────────────────────────────────────────────────────────
+	divW := colW * 4
 	div := subtleStyle.Render(strings.Repeat("─", divW))
 
+	// ── Vertical bar chart ────────────────────────────────────────────────
 	chartRows := m.renderBarChart(divW)
 
+	// ── Keyboard heatmap ──────────────────────────────────────────────────
 	kbRows := m.renderKeyboard()
 
-	sep := hintStyle.Render(" · ")
+	// ── Actions ───────────────────────────────────────────────────────────
+	sep := hintStyle.Render("  ·  ")
 	actions := lipgloss.JoinHorizontal(lipgloss.Top,
 		pendingStyle.Render("enter"), hintStyle.Render(" again"),
 		sep, pendingStyle.Render("m"), hintStyle.Render(" menu"),
@@ -820,7 +849,7 @@ func (m Model) viewResults() string {
 		exportLine = "\n" + m.exportMsg
 	}
 
-	parts := []string{header, "", statsLine, "", div}
+	parts := []string{"", statsRow, "", div, ""}
 	parts = append(parts, chartRows...)
 	if len(kbRows) > 0 {
 		parts = append(parts, "", hintStyle.Render("mistakes"))
@@ -835,7 +864,7 @@ func (m Model) viewResults() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
 
-// renderProgress draws a thin progress bar showing completion through the text.
+// renderProgress draws a polished progress bar using ━ characters.
 func (m Model) renderProgress() string {
 	total := len(m.target)
 	if total == 0 {
@@ -845,28 +874,32 @@ func (m Model) renderProgress() string {
 	if done > total {
 		done = total
 	}
-	width := 40
+	width := 50
 	filled := int(float64(done) / float64(total) * float64(width))
-	bar := strings.Repeat("─", filled) + strings.Repeat(" ", width-filled)
 	pct := int(float64(done) / float64(total) * 100)
-	return hintStyle.Render("│") +
-		subtleStyle.Render(bar) +
-		hintStyle.Render("│") +
-		hintStyle.Render(fmt.Sprintf(" %d%%", pct))
+
+	filledBar := lipgloss.NewStyle().Foreground(activeTheme.mauve).Render(strings.Repeat("━", filled))
+	emptyBar := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("━", width-filled))
+	pctLabel := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render(fmt.Sprintf(" %d%%", pct))
+
+	return filledBar + emptyBar + pctLabel
 }
 
 // renderBarChart renders a vertical bar chart of wpmSamples.
-// Returns a slice of strings — one per row — so the caller can join them.
+// Each cell is individually styled — no string-replacement hacks.
 func (m Model) renderBarChart(width int) []string {
 	samples := m.wpmSamples
-	chartH := 6 // rows tall
+	chartH := 7
 	chartW := width
-
-	if len(samples) == 0 {
-		return []string{subtleStyle.Render("no data yet")}
+	if chartW < 8 {
+		chartW = 8
 	}
 
-	// Sample down/up to chartW columns
+	if len(samples) == 0 {
+		return []string{hintStyle.Render("no data yet")}
+	}
+
+	// Resample to chartW columns
 	cols := make([]float64, chartW)
 	for i := range cols {
 		idx := int(float64(i) / float64(chartW) * float64(len(samples)))
@@ -876,8 +909,7 @@ func (m Model) renderBarChart(width int) []string {
 		cols[i] = samples[idx]
 	}
 
-	maxV := 0.0
-	minV := cols[0]
+	maxV, minV := cols[0], cols[0]
 	peakIdx := 0
 	for i, v := range cols {
 		if v > maxV {
@@ -892,143 +924,98 @@ func (m Model) renderBarChart(width int) []string {
 		maxV = 1
 	}
 
-	// Heights: 0..chartH for each column
+	// height of each column (0..chartH)
 	heights := make([]int, chartW)
 	for i, v := range cols {
 		heights[i] = int(v / maxV * float64(chartH))
 	}
 
-	// Build rows top→bottom
+	// Build each row by styling each cell individually
 	rows := make([]string, chartH)
 	for row := 0; row < chartH; row++ {
-		// row 0 = top, row chartH-1 = bottom
-		threshold := chartH - row // bar must be >= threshold to fill this cell
+		threshold := chartH - row // filled if height >= threshold
 		var sb strings.Builder
 		for ci, h := range heights {
 			if h >= threshold {
 				if ci == peakIdx {
 					sb.WriteString(sparkPeakStyle.Render("█"))
+				} else if threshold <= chartH/2 {
+					sb.WriteString(sparkBarStyle.Render("█"))
 				} else {
-					// Shade bars: brighter nearer the top
-					if threshold > chartH/2 {
-						sb.WriteString(subtleStyle.Render("▓"))
-					} else {
-						sb.WriteString(sparkBarStyle.Render("█"))
-					}
+					// Upper portion — dimmer fill
+					sb.WriteString(lipgloss.NewStyle().Foreground(activeTheme.surface2).Render("▓"))
 				}
 			} else {
-				sb.WriteString(hintStyle.Render("░"))
+				sb.WriteString(lipgloss.NewStyle().Foreground(activeTheme.surface0).Render("░"))
 			}
 		}
 		rows[row] = sb.String()
 	}
 
-	// Y-axis labels (right side)
-	rows[0] += "  " + subtleStyle.Render(fmt.Sprintf("%.0f wpm", maxV))
+	// Y-axis labels
+	rows[0] += "  " + lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true).Render(fmt.Sprintf("%.0f", maxV))
 	rows[chartH/2] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", (maxV+minV)/2))
 	rows[chartH-1] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", minV))
 
-	// X-axis (time labels)
-	xAxis := strings.Repeat("─", chartW)
-	timeLabel := fmt.Sprintf("0s%s%.0fs", strings.Repeat(" ", chartW-6), float64(len(samples)))
-	result := []string{hintStyle.Render("wpm")}
+	// X axis + time labels
+	axis := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("─", chartW))
+	pad := chartW - 6
+	if pad < 0 {
+		pad = 0
+	}
+	tLabel := hintStyle.Render(fmt.Sprintf("0s%s%.0fs", strings.Repeat(" ", pad), float64(len(samples))))
+
+	label := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render("wpm over time")
+	result := []string{label}
 	result = append(result, rows...)
-	result = append(result, hintStyle.Render(xAxis))
-	result = append(result, subtleStyle.Render(timeLabel))
+	result = append(result, axis, tLabel)
 	return result
 }
 
-// renderKeyboard renders a simplified QWERTY heatmap — rows of keys
-// colored by mistake frequency. Returns one string per keyboard row.
+// renderKeyboard renders a QWERTY heatmap using keyHeatStyle from styles.go.
+// Returns one rendered string per keyboard row.
 func (m Model) renderKeyboard() []string {
 	if len(m.mistakeMap) == 0 {
 		return nil
 	}
-
-	// Find max for normalisation
 	maxCount := 0
 	for _, n := range m.mistakeMap {
 		if n > maxCount {
 			maxCount = n
 		}
 	}
-	if maxCount == 0 {
-		maxCount = 1
-	}
 
-	kbLayout := [][]string{
-		{"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
-		{"a", "s", "d", "f", "g", "h", "j", "k", "l"},
-		{"z", "x", "c", "v", "b", "n", "m"},
-	}
-	special := map[rune]string{
-		' ':  "spc",
-		'\t': "tab",
-		'\n': "ret",
-	}
-
-	// Build lookup: display string → count
-	countFor := func(key string) int {
-		// Try as rune
-		r := []rune(key)
-		if len(r) == 1 {
-			return m.mistakeMap[r[0]]
-		}
-		return 0
-	}
-	// special keys stored as rune
-	specCount := map[string]int{
-		"spc": m.mistakeMap[' '],
-		"tab": m.mistakeMap['\t'],
-		"ret": m.mistakeMap['\n'],
-	}
-	_ = special
+	countFor := func(r rune) int { return m.mistakeMap[r] }
 
 	renderKey := func(label string, count int) string {
-		h := float64(count) / float64(maxCount)
-		var style lipgloss.Style
-		switch {
-		case count == 0:
-			style = lipgloss.NewStyle().
-				Foreground(activeTheme.hint).
-				Background(activeTheme.pending).
-				Padding(0, 1)
-		case h < 0.4:
-			style = lipgloss.NewStyle().
-				Foreground(activeTheme.hlNum).
-				Background(lipgloss.Color("#313244")).
-				Padding(0, 1)
-		default:
-			style = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#1e1e2e")).
-				Background(activeTheme.wrong).
-				Padding(0, 1).
-				Bold(true)
-		}
-		return style.Render(label)
+		return keyHeatStyle(count, maxCount).Render(label)
+	}
+
+	kbRows := [][]struct {
+		label string
+		r     rune
+	}{
+		{{"q", 'q'}, {" w", 'w'}, {" e", 'e'}, {" r", 'r'}, {" t", 't'}, {" y", 'y'}, {" u", 'u'}, {" i", 'i'}, {" o", 'o'}, {" p", 'p'}},
+		{{" a", 'a'}, {" s", 's'}, {" d", 'd'}, {" f", 'f'}, {" g", 'g'}, {" h", 'h'}, {" j", 'j'}, {" k", 'k'}, {" l", 'l'}},
+		{{"  z", 'z'}, {" x", 'x'}, {" c", 'c'}, {" v", 'v'}, {" b", 'b'}, {" n", 'n'}, {" m", 'm'}},
 	}
 
 	var rows []string
-	for _, row := range kbLayout {
+	for _, row := range kbRows {
 		var sb strings.Builder
-		for i, k := range row {
-			if i > 0 {
-				sb.WriteString(" ")
-			}
-			sb.WriteString(renderKey(k, countFor(k)))
+		for _, key := range row {
+			sb.WriteString(renderKey(key.label, countFor(key.r)))
 		}
 		rows = append(rows, sb.String())
 	}
 
-	// Special keys row
-	var spRow strings.Builder
-	for i, k := range []string{"spc", "tab", "ret"} {
-		if i > 0 {
-			spRow.WriteString("  ")
-		}
-		spRow.WriteString(renderKey(k, specCount[k]))
-	}
-	rows = append(rows, spRow.String())
+	// Special keys
+	spRow := lipgloss.JoinHorizontal(lipgloss.Top,
+		renderKey("  space  ", countFor(' ')),
+		renderKey("  tab ", countFor('\t')),
+		renderKey("  ret ", countFor('\n')),
+	)
+	rows = append(rows, spRow)
 	return rows
 }
 
@@ -1046,14 +1033,18 @@ func (m Model) viewHistory() string {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 	}
 
+	col := func(s lipgloss.Style, w int, text string) string {
+		return lipgloss.NewStyle().Width(w).Inline(true).Render(s.Render(text))
+	}
+	dimLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2)
 	header := lipgloss.JoinHorizontal(lipgloss.Top,
-		subtleStyle.Render(fmt.Sprintf("%-8s", "wpm")),
-		subtleStyle.Render(fmt.Sprintf("%-8s", "acc%")),
-		subtleStyle.Render(fmt.Sprintf("%-12s", "mode")),
-		subtleStyle.Render(fmt.Sprintf("%-8s", "lang")),
-		subtleStyle.Render("date"),
+		col(dimLabel, 8, "wpm"),
+		col(dimLabel, 8, "acc%"),
+		col(dimLabel, 12, "mode"),
+		col(dimLabel, 8, "lang"),
+		col(dimLabel, 14, "date"),
 	)
-	divider := subtleStyle.Render(strings.Repeat("─", 50))
+	divider := lipgloss.NewStyle().Foreground(activeTheme.surface0).Render(strings.Repeat("─", 52))
 
 	end := m.histOffset + histPageSize
 	if end > len(m.histData) {
@@ -1070,12 +1061,17 @@ func (m Model) viewHistory() string {
 		if lang == "" {
 			lang = "—"
 		}
+		wpmS := lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true)
+		accS := lipgloss.NewStyle().Foreground(activeTheme.acc)
+		modeS := lipgloss.NewStyle().Foreground(activeTheme.text)
+		langS := lipgloss.NewStyle().Foreground(activeTheme.timer)
+		dateS := lipgloss.NewStyle().Foreground(activeTheme.overlay0)
 		row := lipgloss.JoinHorizontal(lipgloss.Top,
-			wpmStyle.Render(fmt.Sprintf("%-8.0f", e.WPM)),
-			accStyle.Render(fmt.Sprintf("%-8.1f", e.Accuracy)),
-			pendingStyle.Render(fmt.Sprintf("%-12s", modeLabel)),
-			timeStyle.Render(fmt.Sprintf("%-8s", lang)),
-			hintStyle.Render(e.At.Format("Jan 02 15:04")),
+			col(wpmS, 8, fmt.Sprintf("%.0f", e.WPM)),
+			col(accS, 8, fmt.Sprintf("%.1f%%", e.Accuracy)),
+			col(modeS, 12, modeLabel),
+			col(langS, 8, lang),
+			col(dateS, 14, e.At.Format("Jan 02 15:04")),
 		)
 		rows = append(rows, row)
 	}
@@ -1088,17 +1084,5 @@ func (m Model) viewHistory() string {
 	parts = append(parts, "", nav)
 
 	body := lipgloss.JoinVertical(lipgloss.Left, parts...)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
-}
-
-func (m Model) viewConfirm() string {
-	body := lipgloss.JoinVertical(lipgloss.Center,
-		titleStyle.Render("quit?"),
-		"",
-		subtleStyle.Render("any progress will be lost"),
-		"",
-		hintStyle.Render("enter / y / q")+subtleStyle.Render("  quit"),
-		hintStyle.Render("esc / n")+subtleStyle.Render("       cancel"),
-	)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
