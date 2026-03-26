@@ -14,7 +14,7 @@ import (
 type appState int
 
 const (
-	stateMenu        appState = iota
+	stateMenu appState = iota
 	stateTyping
 	stateResults
 	stateHistory
@@ -51,7 +51,7 @@ var sparkBars = []rune("▁▂▃▄▅▆▇█")
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 
-type tickMsg   time.Time
+type tickMsg time.Time
 type exportMsg struct {
 	path   string
 	err    error
@@ -89,13 +89,13 @@ type Model struct {
 	state appState
 	mode  testMode
 
-	timeLimitIdx  int
-	timeLeft      int
-	customTimeSecs int    // 0 = use timeLimits preset
-	customTimeStr  string // digits being typed in stateTimeInput
+	timeLimitIdx   int
+	timeLeft       int
+	customTimeSecs int      // 0 = use timeLimits preset
+	customTimeStr  string   // digits being typed in stateTimeInput
 	prevState      appState // state to return to if quit is cancelled
-	langIdx      int
-	activeSnippet Snippet
+	langIdx        int
+	activeSnippet  Snippet
 
 	target      []rune
 	input       []rune
@@ -104,9 +104,9 @@ type Model struct {
 	elapsed     time.Duration
 	started     bool
 
-	blindMode  bool
-	focusMode  bool // hide stats while typing
-	darkTheme  bool // true = mocha, false = latte
+	blindMode bool
+	focusMode bool // hide stats while typing
+	darkTheme bool // true = mocha, false = latte
 
 	totalKeys int
 	errors    int
@@ -118,10 +118,10 @@ type Model struct {
 	lastSample time.Time
 
 	// frozen results
-	finalWPM    float64
-	finalAcc    float64
-	isPB        bool
-	exportMsg   string
+	finalWPM  float64
+	finalAcc  float64
+	isPB      bool
+	exportMsg string
 
 	// pre-computed token kinds for syntax highlighting
 	// per-rune Chroma styles (code mode only)
@@ -311,7 +311,7 @@ func (m Model) updateMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			applyTheme(mocha)
 		} else {
 			applyTheme(latte)
-	    }	
+		}
 	case tea.KeyUp:
 		if m.menuRow == 1 {
 			m.menuRow = 0
@@ -499,13 +499,13 @@ func (m Model) updateResults(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "c", "C":
 			return m, exportCSVCmd()
 		}
-     case tea.KeyCtrlT:
-	 	m.darkTheme = !m.darkTheme
+	case tea.KeyCtrlT:
+		m.darkTheme = !m.darkTheme
 		if m.darkTheme {
 			applyTheme(mocha)
 		} else {
 			applyTheme(latte)
-        }		
+		}
 	}
 	return m, nil
 }
@@ -723,7 +723,9 @@ func (m Model) viewMenu() string {
 	switch m.mode {
 	case modeTime:
 		labels := make([]string, len(timeLimits)+1)
-		for i, t := range timeLimits { labels[i] = fmt.Sprintf("%ds", t) }
+		for i, t := range timeLimits {
+			labels[i] = fmt.Sprintf("%ds", t)
+		}
 		// Custom slot
 		if m.customTimeSecs > 0 && m.timeLimitIdx == len(timeLimits) {
 			labels[len(timeLimits)] = fmt.Sprintf("%ds✎", m.customTimeSecs)
@@ -745,7 +747,9 @@ func (m Model) viewMenu() string {
 	// Theme indicator
 	themeLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2).
 		Render(fmt.Sprintf("ctrl+t  theme: %s", func() string {
-			if isDark() { return "mocha" }
+			if isDark() {
+				return "mocha"
+			}
 			return "latte"
 		}()))
 
@@ -854,11 +858,11 @@ func (m Model) viewTyping() string {
 	var parts []string
 	if !m.focusMode {
 		// Stats row: big WPM on left, acc centre, timer/lang/tags right
-		wpmNum   := wpmStyle.Render(fmt.Sprintf("%.0f", m.calcWPM()))
+		wpmNum := wpmStyle.Render(fmt.Sprintf("%.0f", m.calcWPM()))
 		wpmLabel := subtleStyle.Render(" wpm")
-		accNum   := accStyle.Render(fmt.Sprintf("%.0f", m.calcAccuracy()))
+		accNum := accStyle.Render(fmt.Sprintf("%.0f", m.calcAccuracy()))
 		accLabel := subtleStyle.Render("% acc")
-		statsLeft  := lipgloss.JoinHorizontal(lipgloss.Top, wpmNum, wpmLabel)
+		statsLeft := lipgloss.JoinHorizontal(lipgloss.Top, wpmNum, wpmLabel)
 		statsRight := lipgloss.JoinHorizontal(lipgloss.Top, accNum, accLabel, timerPart, langTag, blindTag)
 		spacer := strings.Repeat(" ", 4)
 		stats := lipgloss.JoinHorizontal(lipgloss.Top, statsLeft, spacer, statsRight)
@@ -900,31 +904,32 @@ func (m Model) viewResults() string {
 	// Use a large bold style for the numbers to give visual weight.
 	numStyle := lipgloss.NewStyle().Bold(true)
 
-	wpmNum  := numStyle.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM))
-	accNum  := numStyle.Foreground(activeTheme.acc).Render(fmt.Sprintf("%.1f%%", m.finalAcc))
+	wpmNum := numStyle.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM))
+	accNum := numStyle.Foreground(activeTheme.acc).Render(fmt.Sprintf("%.1f%%", m.finalAcc))
 	timeNum := numStyle.Foreground(activeTheme.timer).Render(fmt.Sprintf("%.1fs", m.elapsed.Seconds()))
-	pbNum   := numStyle.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", pb))
+	pbNum := numStyle.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", pb))
+
+	colW := 12
 
 	pbBadge := ""
 	if m.isPB {
-		pbBadge = "  " + pbStyle.Render(" new best! ")
+		pbBadge = pbStyle.Width(colW - 2).Render(" new best! ")
 	}
 
-	colW := 12
-	wpmCol  := lipgloss.NewStyle().Width(colW).Render(
-		lipgloss.JoinVertical(lipgloss.Left, wpmNum+pbBadge, subtleStyle.Render("wpm")))
-	accCol  := lipgloss.NewStyle().Width(colW).Render(
-		lipgloss.JoinVertical(lipgloss.Left, accNum,  subtleStyle.Render("acc")))
+	wpmCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, wpmNum, pbBadge, subtleStyle.Render("wpm")))
+	accCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, accNum, subtleStyle.Render("acc")))
 	timeCol := lipgloss.NewStyle().Width(colW).Render(
 		lipgloss.JoinVertical(lipgloss.Left, timeNum, subtleStyle.Render("time")))
-	pbCol   := lipgloss.NewStyle().Width(colW).Render(
-		lipgloss.JoinVertical(lipgloss.Left, pbNum,   subtleStyle.Render("best")))
+	pbCol := lipgloss.NewStyle().Width(colW).Render(
+		lipgloss.JoinVertical(lipgloss.Left, pbNum, subtleStyle.Render("best")))
 
 	statsRow := lipgloss.JoinHorizontal(lipgloss.Bottom, wpmCol, accCol, timeCol, pbCol)
 
 	// ── Divider ───────────────────────────────────────────────────────────
 	divW := colW * 4
-	div  := subtleStyle.Render(strings.Repeat("─", divW))
+	div := subtleStyle.Render(strings.Repeat("─", divW))
 
 	// ── Vertical bar chart ────────────────────────────────────────────────
 	chartRows := m.renderBarChart(divW)
@@ -978,8 +983,8 @@ func (m Model) renderProgress() string {
 	pct := int(float64(done) / float64(total) * 100)
 
 	filledBar := lipgloss.NewStyle().Foreground(activeTheme.mauve).Render(strings.Repeat("━", filled))
-	emptyBar  := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("━", width-filled))
-	pctLabel  := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render(fmt.Sprintf(" %d%%", pct))
+	emptyBar := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("━", width-filled))
+	pctLabel := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render(fmt.Sprintf(" %d%%", pct))
 
 	return filledBar + emptyBar + pctLabel
 }
@@ -990,7 +995,9 @@ func (m Model) renderBarChart(width int) []string {
 	samples := m.wpmSamples
 	chartH := 7
 	chartW := width
-	if chartW < 8 { chartW = 8 }
+	if chartW < 8 {
+		chartW = 8
+	}
 
 	if len(samples) == 0 {
 		return []string{hintStyle.Render("no data yet")}
@@ -1000,21 +1007,32 @@ func (m Model) renderBarChart(width int) []string {
 	cols := make([]float64, chartW)
 	for i := range cols {
 		idx := int(float64(i) / float64(chartW) * float64(len(samples)))
-		if idx >= len(samples) { idx = len(samples) - 1 }
+		if idx >= len(samples) {
+			idx = len(samples) - 1
+		}
 		cols[i] = samples[idx]
 	}
 
 	maxV, minV := cols[0], cols[0]
 	peakIdx := 0
 	for i, v := range cols {
-		if v > maxV { maxV = v; peakIdx = i }
-		if v < minV { minV = v }
+		if v > maxV {
+			maxV = v
+			peakIdx = i
+		}
+		if v < minV {
+			minV = v
+		}
 	}
-	if maxV == 0 { maxV = 1 }
+	if maxV == 0 {
+		maxV = 1
+	}
 
 	// height of each column (0..chartH)
 	heights := make([]int, chartW)
-	for i, v := range cols { heights[i] = int(v / maxV * float64(chartH)) }
+	for i, v := range cols {
+		heights[i] = int(v / maxV * float64(chartH))
+	}
 
 	// Build each row by styling each cell individually
 	rows := make([]string, chartH)
@@ -1039,14 +1057,16 @@ func (m Model) renderBarChart(width int) []string {
 	}
 
 	// Y-axis labels
-	rows[0]        += "  " + lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true).Render(fmt.Sprintf("%.0f", maxV))
+	rows[0] += "  " + lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true).Render(fmt.Sprintf("%.0f", maxV))
 	rows[chartH/2] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", (maxV+minV)/2))
 	rows[chartH-1] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", minV))
 
 	// X axis + time labels
 	axis := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("─", chartW))
-	pad  := chartW - 6
-	if pad < 0 { pad = 0 }
+	pad := chartW - 6
+	if pad < 0 {
+		pad = 0
+	}
 	tLabel := hintStyle.Render(fmt.Sprintf("0s%s%.0fs", strings.Repeat(" ", pad), float64(len(samples))))
 
 	label := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render("wpm over time")
@@ -1064,7 +1084,9 @@ func (m Model) renderKeyboard() []string {
 	}
 	maxCount := 0
 	for _, n := range m.mistakeMap {
-		if n > maxCount { maxCount = n }
+		if n > maxCount {
+			maxCount = n
+		}
 	}
 
 	countFor := func(r rune) int { return m.mistakeMap[r] }
@@ -1073,10 +1095,13 @@ func (m Model) renderKeyboard() []string {
 		return keyHeatStyle(count, maxCount).Render(label)
 	}
 
-	kbRows := [][]struct{ label string; r rune }{
-		{{"q",'q'},{" w",'w'},{" e",'e'},{" r",'r'},{" t",'t'},{" y",'y'},{" u",'u'},{" i",'i'},{" o",'o'},{" p",'p'}},
-		{{" a",'a'},{" s",'s'},{" d",'d'},{" f",'f'},{" g",'g'},{" h",'h'},{" j",'j'},{" k",'k'},{" l",'l'}},
-		{{"  z",'z'},{" x",'x'},{" c",'c'},{" v",'v'},{" b",'b'},{" n",'n'},{" m",'m'}},
+	kbRows := [][]struct {
+		label string
+		r     rune
+	}{
+		{{"q", 'q'}, {" w", 'w'}, {" e", 'e'}, {" r", 'r'}, {" t", 't'}, {" y", 'y'}, {" u", 'u'}, {" i", 'i'}, {" o", 'o'}, {" p", 'p'}},
+		{{" a", 'a'}, {" s", 's'}, {" d", 'd'}, {" f", 'f'}, {" g", 'g'}, {" h", 'h'}, {" j", 'j'}, {" k", 'k'}, {" l", 'l'}},
+		{{"  z", 'z'}, {" x", 'x'}, {" c", 'c'}, {" v", 'v'}, {" b", 'b'}, {" n", 'n'}, {" m", 'm'}},
 	}
 
 	var rows []string
@@ -1168,9 +1193,11 @@ func (m Model) viewTimeInput() string {
 		for _, ch := range m.customTimeStr {
 			secs = secs*10 + int(ch-'0')
 		}
-		if secs > 3600 { secs = 3600 }
+		if secs > 3600 {
+			secs = 3600
+		}
 		mins := secs / 60
-		rem  := secs % 60
+		rem := secs % 60
 		if mins > 0 {
 			dispSecs = fmt.Sprintf("%dm %02ds", mins, rem)
 		} else {
@@ -1186,7 +1213,7 @@ func (m Model) viewTimeInput() string {
 		Align(lipgloss.Center).
 		Render(
 			wpmStyle.Render(display) +
-			lipgloss.NewStyle().Foreground(activeTheme.mauve).Render("█"),
+				lipgloss.NewStyle().Foreground(activeTheme.mauve).Render("█"),
 		)
 
 	var convLine string
@@ -1221,10 +1248,10 @@ func (m Model) viewHistory() string {
 	}
 	dimLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2)
 	header := lipgloss.JoinHorizontal(lipgloss.Top,
-		col(dimLabel, 8,  "wpm"),
-		col(dimLabel, 8,  "acc%"),
+		col(dimLabel, 8, "wpm"),
+		col(dimLabel, 8, "acc%"),
 		col(dimLabel, 12, "mode"),
-		col(dimLabel, 8,  "lang"),
+		col(dimLabel, 8, "lang"),
 		col(dimLabel, 14, "date"),
 	)
 	divider := lipgloss.NewStyle().Foreground(activeTheme.surface0).Render(strings.Repeat("─", 52))
@@ -1244,16 +1271,16 @@ func (m Model) viewHistory() string {
 		if lang == "" {
 			lang = "—"
 		}
-		wpmS  := lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true)
-		accS  := lipgloss.NewStyle().Foreground(activeTheme.acc)
+		wpmS := lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true)
+		accS := lipgloss.NewStyle().Foreground(activeTheme.acc)
 		modeS := lipgloss.NewStyle().Foreground(activeTheme.text)
 		langS := lipgloss.NewStyle().Foreground(activeTheme.timer)
 		dateS := lipgloss.NewStyle().Foreground(activeTheme.overlay0)
 		row := lipgloss.JoinHorizontal(lipgloss.Top,
-			col(wpmS,  8,  fmt.Sprintf("%.0f", e.WPM)),
-			col(accS,  8,  fmt.Sprintf("%.1f%%", e.Accuracy)),
+			col(wpmS, 8, fmt.Sprintf("%.0f", e.WPM)),
+			col(accS, 8, fmt.Sprintf("%.1f%%", e.Accuracy)),
 			col(modeS, 12, modeLabel),
-			col(langS, 8,  lang),
+			col(langS, 8, lang),
 			col(dateS, 14, e.At.Format("Jan 02 15:04")),
 		)
 		rows = append(rows, row)
