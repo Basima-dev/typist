@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,11 +15,12 @@ import (
 type appState int
 
 const (
-	stateMenu      appState = iota
+	stateMenu        appState = iota
 	stateTyping
 	stateResults
 	stateHistory
-	stateTimeInput // custom time entry
+	stateTimeInput   // custom time entry
+	stateConfirmQuit // esc confirmation dialog
 )
 
 type testMode int
@@ -92,6 +94,7 @@ type Model struct {
 	timeLeft      int
 	customTimeSecs int    // 0 = use timeLimits preset
 	customTimeStr  string // digits being typed in stateTimeInput
+	prevState      appState // state to return to if quit is cancelled
 	langIdx      int
 	activeSnippet Snippet
 
@@ -269,6 +272,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateHistory(msg)
 		case stateTimeInput:
 			return m.updateTimeInput(msg)
+		case stateConfirmQuit:
+			return m.updateConfirmQuit(msg)
 		}
 	}
 	return m, nil
@@ -279,8 +284,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) updateMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	subCount := m.subRowCount()
 	switch msg.Type {
-	case tea.KeyCtrlC, tea.KeyEsc:
+	case tea.KeyCtrlC:
 		return m, tea.Quit
+	case tea.KeyEsc:
+		m.prevState = stateMenu
+		m.state = stateConfirmQuit
+		return m, nil
 	case tea.KeyLeft:
 		if m.menuRow == 0 {
 			m.menuCol = (m.menuCol + modeCount - 1) % modeCount
@@ -357,8 +366,12 @@ func (m *Model) applySubRow() {
 
 func (m Model) updateTyping(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyCtrlC, tea.KeyEsc:
+	case tea.KeyCtrlC:
 		return m, tea.Quit
+	case tea.KeyEsc:
+		m.prevState = stateTyping
+		m.state = stateConfirmQuit
+		return m, nil
 	case tea.KeyCtrlR:
 		m.loadText()
 		m.state = stateTyping
@@ -453,8 +466,12 @@ func (m Model) finishTest() Model {
 
 func (m Model) updateResults(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyCtrlC, tea.KeyEsc:
+	case tea.KeyCtrlC:
 		return m, tea.Quit
+	case tea.KeyEsc:
+		m.prevState = stateResults
+		m.state = stateConfirmQuit
+		return m, nil
 	case tea.KeyEnter:
 		return m.restart()
 	case tea.KeyRunes:
@@ -484,6 +501,28 @@ func (m Model) restart() (tea.Model, tea.Cmd) {
 	m.loadText()
 	m.state = stateTyping
 	return m, tickCmd()
+}
+
+// ── Confirm quit ─────────────────────────────────────────────────────────────
+
+func (m Model) updateConfirmQuit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyCtrlC:
+		return m, tea.Quit
+	case tea.KeyRunes:
+		switch string(msg.Runes) {
+		case "y", "Y":
+			return m, tea.Quit
+		case "n", "N", "q", "Q":
+			m.state = m.prevState
+			return m, nil
+		}
+	case tea.KeyEsc, tea.KeyEnter:
+		// Esc or Enter on the confirm screen = cancel (safe default)
+		m.state = m.prevState
+		return m, nil
+	}
+	return m, nil
 }
 
 // ── Time input ───────────────────────────────────────────────────────────────
@@ -616,6 +655,8 @@ func (m Model) View() string {
 		return m.viewHistory()
 	case stateTimeInput:
 		return m.viewTimeInput()
+	case stateConfirmQuit:
+		return m.viewConfirmQuit()
 	}
 	return ""
 }
@@ -1042,6 +1083,59 @@ func (m Model) renderKeyboard() []string {
 	)
 	rows = append(rows, spRow)
 	return rows
+}
+
+// ── Confirm quit view ─────────────────────────────────────────────────────────
+
+func (m Model) viewConfirmQuit() string {
+	// Dim overlay: show whatever the underlying screen was
+	var underlying string
+	switch m.prevState {
+	case stateMenu:
+		underlying = m.viewMenu()
+	case stateTyping:
+		underlying = m.viewTyping()
+	case stateResults:
+		underlying = m.viewResults()
+	default:
+		underlying = ""
+	}
+	_ = underlying // used for context; dialog renders on top centered
+
+	prompt := lipgloss.NewStyle().
+		Foreground(activeTheme.text).Bold(true).
+		Render("quit typist?")
+
+	sub := lipgloss.NewStyle().
+		Foreground(activeTheme.subtext0).
+		Render("your session will be lost")
+
+	yBtn := lipgloss.NewStyle().
+		Foreground(activeTheme.base).
+		Background(activeTheme.red).
+		Bold(true).Padding(0, 3).
+		Render("y  quit")
+
+	nBtn := lipgloss.NewStyle().
+		Foreground(activeTheme.base).
+		Background(activeTheme.green).
+		Bold(true).Padding(0, 3).
+		Render("n  stay")
+
+	btnRow := lipgloss.JoinHorizontal(lipgloss.Top, yBtn, "   ", nBtn)
+
+	hint := hintStyle.Render("esc / enter  →  stay")
+
+	dialog := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(activeTheme.surface1).
+		Background(activeTheme.mantle).
+		Padding(2, 4).
+		Render(lipgloss.JoinVertical(lipgloss.Center,
+			prompt, "", sub, "", btnRow, "", hint,
+		))
+
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
 }
 
 // ── Time input view ──────────────────────────────────────────────────────────
