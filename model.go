@@ -1227,77 +1227,126 @@ func (m Model) renderProgress() string {
 	return filledBar + emptyBar + pctLabel
 }
 
-// renderBarChart renders a vertical bar chart of wpmSamples.
-// Each cell is individually styled — no string-replacement hacks.
+// renderBarChart renders a clean vertical bar chart of wpmSamples.
 func (m Model) renderBarChart(width int) []string {
-	samples := m.wpmSamples
+	allSamples := m.wpmSamples
 	chartH := 7
 	chartW := width
-	if chartW < 8 { chartW = 8 }
+	if chartW < 8 {
+		chartW = 8
+	}
 
-	if len(samples) == 0 {
+	if len(allSamples) == 0 {
 		return []string{hintStyle.Render("no data yet")}
 	}
 
-	// Skip the first 2 samples — early WPM is wildly inflated because
-	// the elapsed time is tiny (< 2s) and small char-count changes cause
-	// huge swings. The chart becomes meaningful after a few seconds.
-	if len(samples) > 3 {
-		samples = samples[2:]
+	// Skip the first 2 seconds — early readings are unreliable because
+	// elapsed time is tiny so tiny char changes cause huge WPM swings.
+	skipN := 0
+	if len(allSamples) > 3 {
+		skipN = 2
 	}
+	samples := allSamples[skipN:]
 
-	// Resample to chartW columns
+	// Resample to exactly chartW columns
 	cols := make([]float64, chartW)
 	for i := range cols {
 		idx := int(float64(i) / float64(chartW) * float64(len(samples)))
-		if idx >= len(samples) { idx = len(samples) - 1 }
+		if idx >= len(samples) {
+			idx = len(samples) - 1
+		}
 		cols[i] = samples[idx]
 	}
 
-	maxV, minV := cols[0], cols[0]
+	// Find peak for highlighting
+	maxV := cols[0]
 	peakIdx := 0
 	for i, v := range cols {
-		if v > maxV { maxV = v; peakIdx = i }
-		if v < minV { minV = v }
+		if v > maxV {
+			maxV = v
+			peakIdx = i
+		}
 	}
-	if maxV == 0 { maxV = 1 }
 
-	// height of each column (0..chartH)
+	// Use 0 as baseline so bars are proportional to actual WPM.
+	// Give 15% headroom above the peak so the top bar never clips.
+	ceiling := maxV * 1.15
+	if ceiling < 10 {
+		ceiling = 10
+	}
+
+	// Map each column to a bar height 0..chartH
 	heights := make([]int, chartW)
-	for i, v := range cols { heights[i] = int(v / maxV * float64(chartH)) }
+	for i, v := range cols {
+		h := int(v / ceiling * float64(chartH))
+		if h < 1 && v > 0 {
+			h = 1 // always show at least one cell if there was any typing
+		}
+		if h > chartH {
+			h = chartH
+		}
+		heights[i] = h
+	}
 
-	// Build each row by styling each cell individually
+	// Build grid top→bottom.
+	// row 0 = top of chart, row chartH-1 = bottom.
+	// A column at height h fills all rows where (chartH - row) <= h,
+	// i.e. rows >= chartH-h.
+	fillStyle  := sparkBarStyle
+	topStyle   := lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true)
+	peakStyle  := sparkPeakStyle
+	emptyStyle := lipgloss.NewStyle().Foreground(activeTheme.surface0)
+
 	rows := make([]string, chartH)
 	for row := 0; row < chartH; row++ {
-		threshold := chartH - row // filled if height >= threshold
+		// which "level" this row represents (1 = bottom, chartH = top)
+		level := chartH - row
 		var sb strings.Builder
 		for ci, h := range heights {
-			if h >= threshold {
+			switch {
+			case h == 0:
+				sb.WriteString(emptyStyle.Render("░"))
+			case level > h:
+				// above this bar
+				sb.WriteString(emptyStyle.Render("░"))
+			case level == h:
+				// top cell of this bar — peak gets yellow, top gets bright
 				if ci == peakIdx {
-					sb.WriteString(sparkPeakStyle.Render("█"))
-				} else if threshold <= chartH/2 {
-					sb.WriteString(sparkBarStyle.Render("█"))
+					sb.WriteString(peakStyle.Render("█"))
 				} else {
-					// Upper portion — dimmer fill
-					sb.WriteString(lipgloss.NewStyle().Foreground(activeTheme.surface2).Render("▓"))
+					sb.WriteString(topStyle.Render("▆"))
 				}
-			} else {
-				sb.WriteString(lipgloss.NewStyle().Foreground(activeTheme.surface0).Render("░"))
+			default:
+				// body of bar
+				if ci == peakIdx {
+					sb.WriteString(peakStyle.Render("█"))
+				} else {
+					sb.WriteString(fillStyle.Render("█"))
+				}
 			}
 		}
 		rows[row] = sb.String()
 	}
 
-	// Y-axis labels
-	rows[0]        += "  " + lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true).Render(fmt.Sprintf("%.0f", maxV))
-	rows[chartH/2] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", (maxV+minV)/2))
-	rows[chartH-1] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", minV))
+	// Y-axis: show actual WPM values (ceiling, half, zero-ish)
+	midV := ceiling / 2
+	rows[0]        += "  " + lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true).Render(fmt.Sprintf("%.0f", ceiling))
+	rows[chartH/2] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", midV))
+	rows[chartH-1] += "  " + hintStyle.Render("0")
 
-	// X axis + time labels
-	axis := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("─", chartW))
-	pad  := chartW - 6
-	if pad < 0 { pad = 0 }
-	tLabel := hintStyle.Render(fmt.Sprintf("0s%s%.0fs", strings.Repeat(" ", pad), float64(len(samples))))
+	// X-axis: actual elapsed seconds (account for skipped samples)
+	totalSecs := len(allSamples)
+	startSec  := skipN
+	axis   := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("─", chartW))
+	pad    := chartW - 6
+	if pad < 0 {
+		pad = 0
+	}
+	tLabel := hintStyle.Render(fmt.Sprintf("%ds%s%ds",
+		startSec,
+		strings.Repeat(" ", pad),
+		totalSecs,
+	))
 
 	label := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render("wpm over time")
 	result := []string{label}
