@@ -16,7 +16,7 @@ import (
 type appState int
 
 const (
-	stateMenu appState = iota
+	stateMenu        appState = iota
 	stateTyping
 	stateResults
 	stateHistory
@@ -53,7 +53,7 @@ var sparkBars = []rune("▁▂▃▄▅▆▇█")
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 
-type tickMsg time.Time
+type tickMsg   time.Time
 type exportMsg struct {
 	path   string
 	err    error
@@ -91,13 +91,13 @@ type Model struct {
 	state appState
 	mode  testMode
 
-	timeLimitIdx   int
-	timeLeft       int
-	customTimeSecs int      // 0 = use timeLimits preset
-	customTimeStr  string   // digits being typed in stateTimeInput
+	timeLimitIdx  int
+	timeLeft      int
+	customTimeSecs int    // 0 = use timeLimits preset
+	customTimeStr  string // digits being typed in stateTimeInput
 	prevState      appState // state to return to if quit is cancelled
-	langIdx        int
-	activeSnippet  Snippet
+	langIdx      int
+	activeSnippet Snippet
 
 	target      []rune
 	input       []rune
@@ -106,12 +106,13 @@ type Model struct {
 	elapsed     time.Duration
 	started     bool
 
-	blindMode bool
-	focusMode bool // hide stats while typing
-	darkTheme bool // true = mocha, false = latte
+	blindMode  bool
+	focusMode  bool // hide stats while typing
+	darkTheme  bool // true = mocha, false = latte
 
-	totalKeys int
-	errors    int
+	totalKeys     int
+	errors        int
+	rawCharsTyped int // every keypress including backspace — for raw WPM
 	// mistake heatmap: count errors per expected rune
 	mistakeMap map[rune]int
 
@@ -120,10 +121,10 @@ type Model struct {
 	lastSample time.Time
 
 	// frozen results
-	finalWPM  float64
-	finalAcc  float64
-	isPB      bool
-	exportMsg string
+	finalWPM    float64
+	finalAcc    float64
+	isPB        bool
+	exportMsg   string
 
 	// pre-computed token kinds for syntax highlighting
 	// per-rune Chroma styles (code mode only)
@@ -178,6 +179,7 @@ func (m *Model) loadText() {
 	m.input = nil
 	m.totalKeys = 0
 	m.errors = 0
+	m.rawCharsTyped = 0
 	m.mistakeMap = make(map[rune]int)
 	m.wpmSamples = nil
 	m.started = false
@@ -398,7 +400,7 @@ func (m Model) updateTyping(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyCtrlC:
 		return m, tea.Quit
-	case tea.KeyCtrlM:
+	case tea.KeyCtrlG:
 		next := m.goToMenu()
 		return next, nil
 	case tea.KeyEsc:
@@ -431,17 +433,22 @@ func (m Model) handleTypingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyBackspace:
 		if len(m.input) > 0 {
 			m.input = m.input[:len(m.input)-1]
+			m.rawCharsTyped++ // backspace costs a keystroke
 		}
 	case tea.KeySpace:
+		m.rawCharsTyped++
 		m = m.appendRune(' ')
 	case tea.KeyTab:
+		m.rawCharsTyped++
 		m = m.appendRune('\t')
 	case tea.KeyEnter:
 		if m.mode == modeCode {
+			m.rawCharsTyped++
 			m = m.appendRune('\n')
 		}
 	case tea.KeyRunes:
 		for _, r := range msg.Runes {
+			m.rawCharsTyped++
 			m = m.appendRune(r)
 		}
 	}
@@ -468,6 +475,8 @@ func (m Model) appendRune(r rune) Model {
 
 func (m Model) finishTest() Model {
 	m.elapsed = time.Since(m.startTime)
+	// Set state first so calcWPM uses m.elapsed (not a second time.Since call)
+	m.state = stateResults
 	m.finalWPM = m.calcWPM()
 	m.finalAcc = m.calcAccuracy()
 	// Append final WPM sample
@@ -482,7 +491,6 @@ func (m Model) finishTest() Model {
 		Mode: m.modeKey(), Lang: m.langKey(),
 		Duration: dur, At: time.Now(),
 	})
-	m.state = stateResults
 	return m
 }
 
@@ -492,7 +500,7 @@ func (m Model) updateResults(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyCtrlC:
 		return m, tea.Quit
-	case tea.KeyCtrlM:
+	case tea.KeyCtrlG:
 		next := m.goToMenu()
 		return next, nil
 	case tea.KeyCtrlT:
@@ -502,6 +510,8 @@ func (m Model) updateResults(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.prevState = stateResults
 		m.state = stateConfirmQuit
 		return m, nil
+	case tea.KeyEnter:
+		return m.restart()
 	case tea.KeyRunes:
 		switch string(msg.Runes) {
 		case "r", "R":
@@ -537,7 +547,7 @@ func (m Model) updateConfirmQuit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyCtrlC:
 		return m, tea.Quit
-	case tea.KeyCtrlM:
+	case tea.KeyCtrlG:
 		next := m.goToMenu()
 		return next, nil
 	case tea.KeyCtrlT:
@@ -551,7 +561,7 @@ func (m Model) updateConfirmQuit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = m.prevState
 			return m, nil
 		}
-	case tea.KeyEsc:
+	case tea.KeyEsc, tea.KeyEnter:
 		// Esc or Enter on the confirm screen = cancel (safe default)
 		m.state = m.prevState
 		return m, nil
@@ -567,6 +577,9 @@ func (m Model) updateTimeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyCtrlC:
 		return m, tea.Quit
+	case tea.KeyCtrlG:
+		next := m.goToMenu()
+		return next, nil
 	case tea.KeyEsc:
 		m.state = stateMenu
 		m.customTimeStr = ""
@@ -576,7 +589,7 @@ func (m Model) updateTimeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.customTimeStr = m.customTimeStr[:len(m.customTimeStr)-1]
 		}
 		return m, nil
-	case tea.KeyCtrlM:
+	case tea.KeyEnter:
 		if m.customTimeStr == "" {
 			m.state = stateMenu
 			return m, nil
@@ -617,7 +630,7 @@ func (m Model) updateHistory(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyCtrlC:
 		return m, tea.Quit
-	case tea.KeyCtrlM:
+	case tea.KeyCtrlG:
 		next := m.goToMenu()
 		return next, nil
 	case tea.KeyCtrlT:
@@ -679,6 +692,24 @@ func (m Model) calcAccuracy() float64 {
 		return 100
 	}
 	return float64(m.totalKeys-m.errors) / float64(m.totalKeys) * 100
+}
+
+
+// calcRawWPM calculates WPM counting every keystroke including backspaces.
+// This is the "honest" speed — correct chars WPM is always shown alongside.
+func (m Model) calcRawWPM() float64 {
+	elapsed := m.elapsed
+	if m.state != stateResults {
+		if !m.started {
+			return 0
+		}
+		elapsed = time.Since(m.startTime)
+	}
+	mins := elapsed.Minutes()
+	if mins == 0 {
+		return 0
+	}
+	return float64(m.rawCharsTyped) / 5.0 / mins
 }
 
 // correctChars returns the number of correctly typed characters.
@@ -745,6 +776,8 @@ func (m Model) topMistakes(n int) []mistakeEntry {
 	}
 	return entries
 }
+
+
 
 // ── Views ─────────────────────────────────────────────────────────────────────
 
@@ -815,9 +848,7 @@ func (m Model) viewMenu() string {
 	switch m.mode {
 	case modeTime:
 		labels := make([]string, len(timeLimits)+1)
-		for i, t := range timeLimits {
-			labels[i] = fmt.Sprintf("%ds", t)
-		}
+		for i, t := range timeLimits { labels[i] = fmt.Sprintf("%ds", t) }
 		// Custom slot
 		if m.customTimeSecs > 0 && m.timeLimitIdx == len(timeLimits) {
 			labels[len(timeLimits)] = fmt.Sprintf("%ds✎", m.customTimeSecs)
@@ -839,9 +870,7 @@ func (m Model) viewMenu() string {
 	// Theme indicator
 	themeLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2).
 		Render(fmt.Sprintf("ctrl+t  theme: %s", func() string {
-			if isDark() {
-				return "mocha"
-			}
+			if isDark() { return "mocha" }
 			return "latte"
 		}()))
 
@@ -950,11 +979,11 @@ func (m Model) viewTyping() string {
 	var parts []string
 	if !m.focusMode {
 		// Stats row: big WPM on left, acc centre, timer/lang/tags right
-		wpmNum := wpmStyle.Render(fmt.Sprintf("%.0f", m.calcWPM()))
+		wpmNum   := wpmStyle.Render(fmt.Sprintf("%.0f", m.calcWPM()))
 		wpmLabel := subtleStyle.Render(" wpm")
-		accNum := accStyle.Render(fmt.Sprintf("%.0f", m.calcAccuracy()))
+		accNum   := accStyle.Render(fmt.Sprintf("%.0f", m.calcAccuracy()))
 		accLabel := subtleStyle.Render("% acc")
-		statsLeft := lipgloss.JoinHorizontal(lipgloss.Top, wpmNum, wpmLabel)
+		statsLeft  := lipgloss.JoinHorizontal(lipgloss.Top, wpmNum, wpmLabel)
 		statsRight := lipgloss.JoinHorizontal(lipgloss.Top, accNum, accLabel, timerPart, langTag, blindTag)
 		spacer := strings.Repeat(" ", 4)
 		stats := lipgloss.JoinHorizontal(lipgloss.Top, statsLeft, spacer, statsRight)
@@ -971,7 +1000,7 @@ func (m Model) viewTyping() string {
 	parts = append(parts, progress, textBlock, "")
 
 	if !m.focusMode {
-		parts = append(parts, hintStyle.Render("ctrl+r restart  ctrl+m menu  ctrl+b blind  ctrl+f focus  ctrl+t theme  esc quit"))
+		parts = append(parts, hintStyle.Render("ctrl+r restart  ctrl+g menu  ctrl+b blind  ctrl+f focus  ctrl+t theme  esc quit"))
 	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left, parts...)
@@ -990,7 +1019,7 @@ func (m Model) pendingWithHL(pos int, display string) string {
 
 func (m Model) viewResults() string {
 	dur := m.activeDuration()
-	pb := personalBest(m.modeKey(), m.langKey(), dur)
+	pb  := personalBest(m.modeKey(), m.langKey(), dur)
 	numStyle := lipgloss.NewStyle().Bold(true)
 
 	// ── Primary stat blocks ─────────────────────────────────────────────
@@ -1003,10 +1032,10 @@ func (m Model) viewResults() string {
 			lipgloss.JoinVertical(lipgloss.Left, val, subtleStyle.Render(label)),
 		)
 	}
-	wpmCol := mkCol(numStyle.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM)), "wpm")
-	accCol := mkCol(numStyle.Foreground(activeTheme.acc).Render(fmt.Sprintf("%.1f%%", m.finalAcc)), "acc")
+	wpmCol  := mkCol(numStyle.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM)),   "wpm")
+	accCol  := mkCol(numStyle.Foreground(activeTheme.acc).Render(fmt.Sprintf("%.1f%%", m.finalAcc)), "acc")
 	timeCol := mkCol(numStyle.Foreground(activeTheme.timer).Render(fmt.Sprintf("%.1fs", m.elapsed.Seconds())), "time")
-	pbCol := mkCol(numStyle.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", pb)), "best")
+	pbCol   := mkCol(numStyle.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", pb)),        "best")
 	statsRow := lipgloss.JoinHorizontal(lipgloss.Bottom, wpmCol, accCol, timeCol, pbCol)
 
 	// Badges row: "new best!" and delta, on their own line, no width constraints
@@ -1016,10 +1045,10 @@ func (m Model) viewResults() string {
 	}
 	if delta, ok := m.deltaFromLast(dur); ok {
 		sign := "+"
-		col := activeTheme.green
+		col  := activeTheme.green
 		if delta < 0 {
 			sign = ""
-			col = activeTheme.red
+			col  = activeTheme.red
 		}
 		badgeParts = append(badgeParts,
 			lipgloss.NewStyle().Foreground(col).Bold(true).
@@ -1032,16 +1061,18 @@ func (m Model) viewResults() string {
 
 	// ── Divider ───────────────────────────────────────────────────────────
 	divW := 48
-	div := lipgloss.NewStyle().Foreground(activeTheme.surface0).Render(strings.Repeat("─", divW))
+	div  := lipgloss.NewStyle().Foreground(activeTheme.surface0).Render(strings.Repeat("─", divW))
 
 	// ── Secondary metrics row ─────────────────────────────────────────────
-	correct := m.correctChars()
+	correct   := m.correctChars()
 	incorrect := m.errors
-	total := m.totalKeys
-	stddev := m.wpmStdDev()
+	total     := m.totalKeys
+	stddev    := m.wpmStdDev()
 
 	labelS := lipgloss.NewStyle().Foreground(activeTheme.surface2)
-	valS := lipgloss.NewStyle().Foreground(activeTheme.subtext1).Bold(true)
+	valS   := lipgloss.NewStyle().Foreground(activeTheme.subtext1).Bold(true)
+
+	rawWPM := m.calcRawWPM()
 
 	// char counts
 	charBlock := lipgloss.JoinVertical(lipgloss.Left,
@@ -1052,7 +1083,18 @@ func (m Model) viewResults() string {
 			labelS.Render("/"),
 			valS.Render(fmt.Sprintf("%d", total)),
 		),
-		labelS.Render("correct/errors/total"),
+		labelS.Render("correct / errors / total"),
+	)
+
+	// raw vs net WPM block
+	rawBlock := lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.JoinHorizontal(lipgloss.Top,
+			valS.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM)),
+			labelS.Render("  net  "),
+			valS.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", rawWPM)),
+			labelS.Render("  raw"),
+		),
+		labelS.Render("net wpm / raw wpm"),
 	)
 
 	// consistency
@@ -1088,7 +1130,7 @@ func (m Model) viewResults() string {
 
 	spacer := strings.Repeat(" ", 4)
 	metricsRow := lipgloss.JoinHorizontal(lipgloss.Top,
-		charBlock, spacer, consBlock, spacer, errBlock,
+		rawBlock, spacer, charBlock, spacer, consBlock, spacer, errBlock,
 	)
 
 	// ── Top mistakes detail ───────────────────────────────────────────────
@@ -1099,22 +1141,16 @@ func (m Model) viewResults() string {
 		for _, e := range top {
 			label := string(e.ch)
 			switch e.ch {
-			case ' ':
-				label = "spc"
-			case '\t':
-				label = "tab"
-			case '\n':
-				label = "ret"
+			case ' ':  label = "spc"
+			case '\t': label = "tab"
+			case '\n': label = "ret"
 			}
 			intensity := float64(e.count) / float64(top[0].count)
 			var col lipgloss.Color
 			switch {
-			case intensity >= 0.75:
-				col = activeTheme.red
-			case intensity >= 0.4:
-				col = activeTheme.peach
-			default:
-				col = activeTheme.surface2
+			case intensity >= 0.75: col = activeTheme.red
+			case intensity >= 0.4:  col = activeTheme.peach
+			default:                col = activeTheme.surface2
 			}
 			sb.WriteString(lipgloss.NewStyle().
 				Foreground(activeTheme.base).
@@ -1185,8 +1221,8 @@ func (m Model) renderProgress() string {
 	pct := int(float64(done) / float64(total) * 100)
 
 	filledBar := lipgloss.NewStyle().Foreground(activeTheme.mauve).Render(strings.Repeat("━", filled))
-	emptyBar := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("━", width-filled))
-	pctLabel := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render(fmt.Sprintf(" %d%%", pct))
+	emptyBar  := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("━", width-filled))
+	pctLabel  := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render(fmt.Sprintf(" %d%%", pct))
 
 	return filledBar + emptyBar + pctLabel
 }
@@ -1197,44 +1233,38 @@ func (m Model) renderBarChart(width int) []string {
 	samples := m.wpmSamples
 	chartH := 7
 	chartW := width
-	if chartW < 8 {
-		chartW = 8
-	}
+	if chartW < 8 { chartW = 8 }
 
 	if len(samples) == 0 {
 		return []string{hintStyle.Render("no data yet")}
+	}
+
+	// Skip the first 2 samples — early WPM is wildly inflated because
+	// the elapsed time is tiny (< 2s) and small char-count changes cause
+	// huge swings. The chart becomes meaningful after a few seconds.
+	if len(samples) > 3 {
+		samples = samples[2:]
 	}
 
 	// Resample to chartW columns
 	cols := make([]float64, chartW)
 	for i := range cols {
 		idx := int(float64(i) / float64(chartW) * float64(len(samples)))
-		if idx >= len(samples) {
-			idx = len(samples) - 1
-		}
+		if idx >= len(samples) { idx = len(samples) - 1 }
 		cols[i] = samples[idx]
 	}
 
 	maxV, minV := cols[0], cols[0]
 	peakIdx := 0
 	for i, v := range cols {
-		if v > maxV {
-			maxV = v
-			peakIdx = i
-		}
-		if v < minV {
-			minV = v
-		}
+		if v > maxV { maxV = v; peakIdx = i }
+		if v < minV { minV = v }
 	}
-	if maxV == 0 {
-		maxV = 1
-	}
+	if maxV == 0 { maxV = 1 }
 
 	// height of each column (0..chartH)
 	heights := make([]int, chartW)
-	for i, v := range cols {
-		heights[i] = int(v / maxV * float64(chartH))
-	}
+	for i, v := range cols { heights[i] = int(v / maxV * float64(chartH)) }
 
 	// Build each row by styling each cell individually
 	rows := make([]string, chartH)
@@ -1259,16 +1289,14 @@ func (m Model) renderBarChart(width int) []string {
 	}
 
 	// Y-axis labels
-	rows[0] += "  " + lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true).Render(fmt.Sprintf("%.0f", maxV))
+	rows[0]        += "  " + lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true).Render(fmt.Sprintf("%.0f", maxV))
 	rows[chartH/2] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", (maxV+minV)/2))
 	rows[chartH-1] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", minV))
 
 	// X axis + time labels
 	axis := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("─", chartW))
-	pad := chartW - 6
-	if pad < 0 {
-		pad = 0
-	}
+	pad  := chartW - 6
+	if pad < 0 { pad = 0 }
 	tLabel := hintStyle.Render(fmt.Sprintf("0s%s%.0fs", strings.Repeat(" ", pad), float64(len(samples))))
 
 	label := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render("wpm over time")
@@ -1286,9 +1314,7 @@ func (m Model) renderKeyboard() []string {
 	}
 	maxCount := 0
 	for _, n := range m.mistakeMap {
-		if n > maxCount {
-			maxCount = n
-		}
+		if n > maxCount { maxCount = n }
 	}
 
 	countFor := func(r rune) int { return m.mistakeMap[r] }
@@ -1297,13 +1323,10 @@ func (m Model) renderKeyboard() []string {
 		return keyHeatStyle(count, maxCount).Render(label)
 	}
 
-	kbRows := [][]struct {
-		label string
-		r     rune
-	}{
-		{{"q", 'q'}, {" w", 'w'}, {" e", 'e'}, {" r", 'r'}, {" t", 't'}, {" y", 'y'}, {" u", 'u'}, {" i", 'i'}, {" o", 'o'}, {" p", 'p'}},
-		{{" a", 'a'}, {" s", 's'}, {" d", 'd'}, {" f", 'f'}, {" g", 'g'}, {" h", 'h'}, {" j", 'j'}, {" k", 'k'}, {" l", 'l'}},
-		{{"  z", 'z'}, {" x", 'x'}, {" c", 'c'}, {" v", 'v'}, {" b", 'b'}, {" n", 'n'}, {" m", 'm'}},
+	kbRows := [][]struct{ label string; r rune }{
+		{{"q",'q'},{" w",'w'},{" e",'e'},{" r",'r'},{" t",'t'},{" y",'y'},{" u",'u'},{" i",'i'},{" o",'o'},{" p",'p'}},
+		{{" a",'a'},{" s",'s'},{" d",'d'},{" f",'f'},{" g",'g'},{" h",'h'},{" j",'j'},{" k",'k'},{" l",'l'}},
+		{{"  z",'z'},{" x",'x'},{" c",'c'},{" v",'v'},{" b",'b'},{" n",'n'},{" m",'m'}},
 	}
 
 	var rows []string
@@ -1395,11 +1418,9 @@ func (m Model) viewTimeInput() string {
 		for _, ch := range m.customTimeStr {
 			secs = secs*10 + int(ch-'0')
 		}
-		if secs > 3600 {
-			secs = 3600
-		}
+		if secs > 3600 { secs = 3600 }
 		mins := secs / 60
-		rem := secs % 60
+		rem  := secs % 60
 		if mins > 0 {
 			dispSecs = fmt.Sprintf("%dm %02ds", mins, rem)
 		} else {
@@ -1415,7 +1436,7 @@ func (m Model) viewTimeInput() string {
 		Align(lipgloss.Center).
 		Render(
 			wpmStyle.Render(display) +
-				lipgloss.NewStyle().Foreground(activeTheme.mauve).Render("█"),
+			lipgloss.NewStyle().Foreground(activeTheme.mauve).Render("█"),
 		)
 
 	var convLine string
@@ -1450,10 +1471,10 @@ func (m Model) viewHistory() string {
 	}
 	dimLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2)
 	header := lipgloss.JoinHorizontal(lipgloss.Top,
-		col(dimLabel, 8, "wpm"),
-		col(dimLabel, 8, "acc%"),
+		col(dimLabel, 8,  "wpm"),
+		col(dimLabel, 8,  "acc%"),
 		col(dimLabel, 12, "mode"),
-		col(dimLabel, 8, "lang"),
+		col(dimLabel, 8,  "lang"),
 		col(dimLabel, 14, "date"),
 	)
 	divider := lipgloss.NewStyle().Foreground(activeTheme.surface0).Render(strings.Repeat("─", 52))
@@ -1473,16 +1494,16 @@ func (m Model) viewHistory() string {
 		if lang == "" {
 			lang = "—"
 		}
-		wpmS := lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true)
-		accS := lipgloss.NewStyle().Foreground(activeTheme.acc)
+		wpmS  := lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true)
+		accS  := lipgloss.NewStyle().Foreground(activeTheme.acc)
 		modeS := lipgloss.NewStyle().Foreground(activeTheme.text)
 		langS := lipgloss.NewStyle().Foreground(activeTheme.timer)
 		dateS := lipgloss.NewStyle().Foreground(activeTheme.overlay0)
 		row := lipgloss.JoinHorizontal(lipgloss.Top,
-			col(wpmS, 8, fmt.Sprintf("%.0f", e.WPM)),
-			col(accS, 8, fmt.Sprintf("%.1f%%", e.Accuracy)),
+			col(wpmS,  8,  fmt.Sprintf("%.0f", e.WPM)),
+			col(accS,  8,  fmt.Sprintf("%.1f%%", e.Accuracy)),
 			col(modeS, 12, modeLabel),
-			col(langS, 8, lang),
+			col(langS, 8,  lang),
 			col(dateS, 14, e.At.Format("Jan 02 15:04")),
 		)
 		rows = append(rows, row)
