@@ -11,8 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ── Enums ─────────────────────────────────────────────────────────────────────
-
+//enums 
 type appState int
 
 const (
@@ -36,7 +35,7 @@ const (
 var modeNames = []string{"words", "time", "quote", "code"}
 var modeCount = len(modeNames)
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// const 
 
 const (
 	numWords     = 30
@@ -51,7 +50,7 @@ var timeLimits = []int{15, 30, 60, 120}
 // Sparkline unicode bars
 var sparkBars = []rune("▁▂▃▄▅▆▇█")
 
-// ── Messages ──────────────────────────────────────────────────────────────────
+//  Messages
 
 type tickMsg   time.Time
 type exportMsg struct {
@@ -78,14 +77,14 @@ func exportCSVCmd() tea.Cmd {
 	}
 }
 
-// ── mistakeEntry for sorting heatmap ─────────────────────────────────────────
+// mistakeEntry for sorting heatmap 
 
 type mistakeEntry struct {
 	ch    rune
 	count int
 }
 
-// ── Model ─────────────────────────────────────────────────────────────────────
+// Model 
 
 type Model struct {
 	state appState
