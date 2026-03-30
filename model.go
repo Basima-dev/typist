@@ -11,7 +11,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-//enums 
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
 type appState int
 
 const (
@@ -35,7 +36,7 @@ const (
 var modeNames = []string{"words", "time", "quote", "code"}
 var modeCount = len(modeNames)
 
-// const 
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const (
 	numWords     = 30
@@ -50,7 +51,7 @@ var timeLimits = []int{15, 30, 60, 120}
 // Sparkline unicode bars
 var sparkBars = []rune("▁▂▃▄▅▆▇█")
 
-//  Messages
+// ── Messages ──────────────────────────────────────────────────────────────────
 
 type tickMsg   time.Time
 type exportMsg struct {
@@ -77,14 +78,14 @@ func exportCSVCmd() tea.Cmd {
 	}
 }
 
-// mistakeEntry for sorting heatmap 
+// ── mistakeEntry for sorting heatmap ─────────────────────────────────────────
 
 type mistakeEntry struct {
 	ch    rune
 	count int
 }
 
-// Model 
+// ── Model ─────────────────────────────────────────────────────────────────────
 
 type Model struct {
 	state appState
@@ -107,7 +108,7 @@ type Model struct {
 
 	blindMode  bool
 	focusMode  bool // hide stats while typing
-	darkTheme  bool // true = mocha, false = latte
+	themeIdx   int  // index into themes slice
 
 	totalKeys     int
 	errors        int
@@ -148,8 +149,8 @@ func NewModel() Model {
 		mode:         modeWords,
 		timeLimitIdx: 1,
 		langIdx:      0,
-		mistakeMap:   make(map[rune]int),
-		darkTheme:    true,
+		mistakeMap: make(map[rune]int),
+		themeIdx:   0,
 	}
 }
 
@@ -281,14 +282,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// toggleTheme switches between mocha and latte and rebuilds any active hlMap.
+// toggleTheme cycles through all available themes and rebuilds any active hlMap.
 func (m *Model) toggleTheme() {
-	m.darkTheme = !m.darkTheme
-	if m.darkTheme {
-		applyTheme(mocha)
-	} else {
-		applyTheme(latte)
-	}
+	m.themeIdx = (m.themeIdx + 1) % len(themes)
+	applyTheme(themes[m.themeIdx])
 	if m.mode == modeCode && len(m.target) > 0 {
 		m.hlMap = BuildStyleMap(string(m.target), langKeys[m.langIdx])
 	}
@@ -300,10 +297,7 @@ func (m Model) goToMenu() Model {
 	next.width, next.height = m.width, m.height
 	next.mode, next.timeLimitIdx, next.langIdx = m.mode, m.timeLimitIdx, m.langIdx
 	next.customTimeSecs = m.customTimeSecs
-	next.focusMode, next.darkTheme = m.focusMode, m.darkTheme
-	if !next.darkTheme {
-		applyTheme(latte)
-	}
+	next.focusMode, next.themeIdx = m.focusMode, m.themeIdx
 	return next
 }
 
@@ -868,10 +862,7 @@ func (m Model) viewMenu() string {
 
 	// Theme indicator
 	themeLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2).
-		Render(fmt.Sprintf("ctrl+t  theme: %s", func() string {
-			if isDark() { return "mocha" }
-			return "latte"
-		}()))
+		Render("ctrl+t  theme: " + activeTheme.name)
 
 	body := lipgloss.JoinVertical(lipgloss.Center,
 		logo, "", tagline, "", "", sectionLabel, "",
@@ -1034,7 +1025,7 @@ func (m Model) viewResults() string {
 	wpmCol  := mkCol(numStyle.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM)),   "wpm")
 	accCol  := mkCol(numStyle.Foreground(activeTheme.acc).Render(fmt.Sprintf("%.1f%%", m.finalAcc)), "acc")
 	timeCol := mkCol(numStyle.Foreground(activeTheme.timer).Render(fmt.Sprintf("%.1fs", m.elapsed.Seconds())), "time")
-	pbCol   := mkCol(numStyle.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", pb)),        "best")
+	pbCol   := mkCol(numStyle.Foreground(activeTheme.subtext0).Render(fmt.Sprintf("%.0f", pb)),        "best")
 	statsRow := lipgloss.JoinHorizontal(lipgloss.Bottom, wpmCol, accCol, timeCol, pbCol)
 
 	// Badges row: "new best!" and delta, on their own line, no width constraints
@@ -1059,7 +1050,10 @@ func (m Model) viewResults() string {
 	}
 
 	// ── Divider ───────────────────────────────────────────────────────────
-	divW := 48
+	// Use terminal width minus margins for the chart; min 20, max 80
+	divW := m.width - 20
+	if divW < 20 { divW = 20 }
+	if divW > 80 { divW = 80 }
 	div  := lipgloss.NewStyle().Foreground(activeTheme.surface0).Render(strings.Repeat("─", divW))
 
 	// ── Secondary metrics row ─────────────────────────────────────────────
@@ -1090,7 +1084,7 @@ func (m Model) viewResults() string {
 		lipgloss.JoinHorizontal(lipgloss.Top,
 			valS.Foreground(activeTheme.wpm).Render(fmt.Sprintf("%.0f", m.finalWPM)),
 			labelS.Render("  net  "),
-			valS.Foreground(activeTheme.subtle).Render(fmt.Sprintf("%.0f", rawWPM)),
+			valS.Foreground(activeTheme.subtext0).Render(fmt.Sprintf("%.0f", rawWPM)),
 			labelS.Render("  raw"),
 		),
 		labelS.Render("net wpm / raw wpm"),
@@ -1226,97 +1220,114 @@ func (m Model) renderProgress() string {
 	return filledBar + emptyBar + pctLabel
 }
 
-// renderBarChart renders a clean vertical bar chart of wpmSamples.
-func (m Model) renderBarChart(width int) []string {
-	allSamples := m.wpmSamples
-	chartH := 7
-	chartW := width
-	if chartW < 8 {
-		chartW = 8
-	}
+// renderBarChart renders a WPM chart using a 5-row grid.
+// Each column is one sample. Scaling uses the actual min→max range so
+// variation is always visible even for consistent typists.
+func (m Model) renderBarChart(maxCols int) []string {
+	const chartH = 5           // rows tall
+	const minRange = 15.0      // minimum WPM range shown — prevents flat-line look
+	if maxCols < 20 { maxCols = 20 }
 
+	allSamples := m.wpmSamples
 	if len(allSamples) == 0 {
 		return []string{hintStyle.Render("no data yet")}
 	}
 
-	// Skip the first 2 seconds — early readings are unreliable because
-	// elapsed time is tiny so tiny char changes cause huge WPM swings.
-	skipN := 0
-	if len(allSamples) > 3 {
-		skipN = 2
-	}
-	samples := allSamples[skipN:]
-
-	// Resample to exactly chartW columns
-	cols := make([]float64, chartW)
-	for i := range cols {
-		idx := int(float64(i) / float64(chartW) * float64(len(samples)))
-		if idx >= len(samples) {
-			idx = len(samples) - 1
-		}
-		cols[i] = samples[idx]
+	// Drop first 2 noisy samples only when there are enough to spare
+	samples := allSamples
+	if len(samples) > 4 {
+		samples = samples[2:]
 	}
 
-	// Find peak for highlighting
-	maxV := cols[0]
+	// Compute stats
+	minV, maxV := samples[0], samples[0]
 	peakIdx := 0
-	for i, v := range cols {
-		if v > maxV {
-			maxV = v
-			peakIdx = i
+	sum := 0.0
+	for i, v := range samples {
+		if v > maxV { maxV = v; peakIdx = i }
+		if v < minV { minV = v }
+		sum += v
+	}
+	avg := sum / float64(len(samples))
+
+	// Enforce a minimum visible range centred on the average so the
+	// chart always shows meaningful height variation.
+	if maxV-minV < minRange {
+		half := minRange / 2
+		minV = avg - half
+		maxV = avg + half
+		if minV < 0 { minV = 0 }
+	}
+	rangeV := maxV - minV
+	if rangeV == 0 { rangeV = 1 }
+
+	// Limit columns so we don't overflow the terminal
+	cols := samples
+	if len(cols) > maxCols {
+		// downsample: pick evenly spaced samples
+		down := make([]float64, maxCols)
+		for i := range down {
+			idx := int(float64(i) / float64(maxCols) * float64(len(samples)))
+			if idx >= len(samples) { idx = len(samples) - 1 }
+			down[i] = samples[idx]
+		}
+		cols = down
+		peakIdx = 0
+		for i, v := range cols {
+			if v > cols[peakIdx] { peakIdx = i }
 		}
 	}
 
-	// Use 0 as baseline so bars are proportional to actual WPM.
-	// Give 15% headroom above the peak so the top bar never clips.
-	ceiling := maxV * 1.15
-	if ceiling < 10 {
-		ceiling = 10
-	}
-
-	// Map each column to a bar height 0..chartH
-	heights := make([]int, chartW)
+	// Map each column value to a height 1..chartH
+	heights := make([]int, len(cols))
 	for i, v := range cols {
-		h := int(v / ceiling * float64(chartH))
-		if h < 1 && v > 0 {
-			h = 1 // always show at least one cell if there was any typing
-		}
-		if h > chartH {
-			h = chartH
-		}
+		h := int((v-minV)/rangeV*float64(chartH-1)) + 1
+		if h < 1 { h = 1 }
+		if h > chartH { h = chartH }
 		heights[i] = h
 	}
 
-	// Build grid top→bottom.
-	// row 0 = top of chart, row chartH-1 = bottom.
-	// A column at height h fills all rows where (chartH - row) <= h,
-	// i.e. rows >= chartH-h.
+	// Y-axis label width
+	topLabel := fmt.Sprintf("%3.0f", maxV)
+	midLabel := fmt.Sprintf("%3.0f", (minV+maxV)/2)
+	botLabel := fmt.Sprintf("%3.0f", minV)
+	yW := len(topLabel) // always 3
+
+	// Build grid rows top→bottom
+	emptyStyle := lipgloss.NewStyle().Foreground(activeTheme.surface1)
 	fillStyle  := sparkBarStyle
-	topStyle   := lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true)
 	peakStyle  := sparkPeakStyle
-	emptyStyle := lipgloss.NewStyle().Foreground(activeTheme.surface0)
+	topStyle   := lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true)
+	yStyle     := hintStyle
 
 	rows := make([]string, chartH)
 	for row := 0; row < chartH; row++ {
-		// which "level" this row represents (1 = bottom, chartH = top)
-		level := chartH - row
+		level := chartH - row // 1=bottom, chartH=top
 		var sb strings.Builder
+
+		// Y-axis label (only on rows 0, mid, bottom)
+		switch row {
+		case 0:
+			sb.WriteString(yStyle.Render(topLabel + " "))
+		case chartH / 2:
+			sb.WriteString(yStyle.Render(midLabel + " "))
+		case chartH - 1:
+			sb.WriteString(yStyle.Render(botLabel + " "))
+		default:
+			sb.WriteString(strings.Repeat(" ", yW+1))
+		}
+
 		for ci, h := range heights {
 			switch {
-			case h == 0:
-				sb.WriteString(emptyStyle.Render("░"))
 			case level > h:
-				// above this bar
-				sb.WriteString(emptyStyle.Render("░"))
+				sb.WriteString(emptyStyle.Render("·"))
 			case level == h:
-				// top cell of this bar — peak gets yellow, top gets bright
 				if ci == peakIdx {
 					sb.WriteString(peakStyle.Render("█"))
 				} else {
 					sb.WriteString(topStyle.Render("▆"))
 				}
 			default:
-				// body of bar
 				if ci == peakIdx {
 					sb.WriteString(peakStyle.Render("█"))
 				} else {
@@ -1327,30 +1338,23 @@ func (m Model) renderBarChart(width int) []string {
 		rows[row] = sb.String()
 	}
 
-	// Y-axis: show actual WPM values (ceiling, half, zero-ish)
-	midV := ceiling / 2
-	rows[0]        += "  " + lipgloss.NewStyle().Foreground(activeTheme.wpm).Bold(true).Render(fmt.Sprintf("%.0f", ceiling))
-	rows[chartH/2] += "  " + hintStyle.Render(fmt.Sprintf("%.0f", midV))
-	rows[chartH-1] += "  " + hintStyle.Render("0")
+	// X-axis
+	xAxis := strings.Repeat(" ", yW+1) +
+		lipgloss.NewStyle().Foreground(activeTheme.surface1).
+			Render(strings.Repeat("─", len(cols)))
 
-	// X-axis: actual elapsed seconds (account for skipped samples)
-	totalSecs := len(allSamples)
-	startSec  := skipN
-	axis   := lipgloss.NewStyle().Foreground(activeTheme.surface1).Render(strings.Repeat("─", chartW))
-	pad    := chartW - 6
-	if pad < 0 {
-		pad = 0
-	}
-	tLabel := hintStyle.Render(fmt.Sprintf("%ds%s%ds",
-		startSec,
-		strings.Repeat(" ", pad),
-		totalSecs,
-	))
+	// Duration and stats footer
+	dur := len(allSamples)
+	footer := lipgloss.JoinHorizontal(lipgloss.Top,
+		hintStyle.Render(fmt.Sprintf("%ds  ", dur)),
+		subtleStyle.Render(fmt.Sprintf("%.0f avg  ", avg)),
+		sparkPeakStyle.Render(fmt.Sprintf("%.0f peak wpm", maxV)),
+	)
 
 	label := lipgloss.NewStyle().Foreground(activeTheme.subtext0).Render("wpm over time")
 	result := []string{label}
 	result = append(result, rows...)
-	result = append(result, axis, tLabel)
+	result = append(result, xAxis, footer)
 	return result
 }
 

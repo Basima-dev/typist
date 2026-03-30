@@ -2,9 +2,9 @@ package main
 
 import "github.com/charmbracelet/lipgloss"
 
-// Theme holds the full Catppuccin palette plus semantic mappings.
+// Theme holds all colours for one visual theme.
 type Theme struct {
-	// Base palette
+	name     string
 	base     lipgloss.Color
 	mantle   lipgloss.Color
 	crust    lipgloss.Color
@@ -28,25 +28,18 @@ type Theme struct {
 	red      lipgloss.Color
 	mauve    lipgloss.Color
 	pink     lipgloss.Color
-	flamingo lipgloss.Color
-	rosewater lipgloss.Color
 
 	// Semantic
 	correct  lipgloss.Color
 	wrong    lipgloss.Color
 	pending  lipgloss.Color
 	cursor   lipgloss.Color
-	title    lipgloss.Color
 	wpm      lipgloss.Color
 	acc      lipgloss.Color
 	timer    lipgloss.Color
-	subtle   lipgloss.Color
-	hint     lipgloss.Color
 	pbFg     lipgloss.Color
 	pbBg     lipgloss.Color
-	menuSel  lipgloss.Color
 	menuSelB lipgloss.Color
-	menuDim  lipgloss.Color
 	border   lipgloss.Color
 
 	// Syntax
@@ -61,21 +54,21 @@ type Theme struct {
 	spark     lipgloss.Color
 	sparkPeak lipgloss.Color
 
-	// Heatmap intensity stops (low → high mistake count)
-	heat0 lipgloss.Color // no mistakes  — surface
-	heat1 lipgloss.Color // low          — yellow
-	heat2 lipgloss.Color // mid          — peach
-	heat3 lipgloss.Color // high         — maroon
-	heat4 lipgloss.Color // critical     — red
+	// Heatmap (4 intensity levels + backgrounds)
+	heat1 lipgloss.Color
+	heat2 lipgloss.Color
+	heat3 lipgloss.Color
+	heat4 lipgloss.Color
 	heatBg1 lipgloss.Color
 	heatBg2 lipgloss.Color
 	heatBg3 lipgloss.Color
 	heatBg4 lipgloss.Color
 }
 
-// ── Catppuccin Mocha (dark) ────────────────────────────────────────────────
+// ── Catppuccin Mocha ──────────────────────────────────────────────────────────
 
 var mocha = Theme{
+	name: "mocha",
 	base: "#1e1e2e", mantle: "#181825", crust: "#11111b",
 	text: "#cdd6f4", subtext0: "#a6adc8", subtext1: "#bac2de",
 	surface0: "#313244", surface1: "#45475a", surface2: "#585b70",
@@ -84,26 +77,23 @@ var mocha = Theme{
 	sky: "#89dceb", teal: "#94e2d5", green: "#a6e3a1",
 	yellow: "#f9e2af", peach: "#fab387", maroon: "#eba0ac",
 	red: "#f38ba8", mauve: "#cba6f7", pink: "#f5c2e7",
-	flamingo: "#f2cdcd", rosewater: "#f5e0dc",
 
 	correct: "#a6e3a1", wrong: "#f38ba8", pending: "#45475a",
-	cursor: "#cba6f7", title: "#cba6f7",
+	cursor: "#cba6f7",
 	wpm: "#f5c2e7", acc: "#94e2d5", timer: "#f9e2af",
-	subtle: "#585b70", hint: "#45475a",
 	pbFg: "#1e1e2e", pbBg: "#f9e2af",
-	menuSel: "#1e1e2e", menuSelB: "#cba6f7", menuDim: "#45475a",
-	border: "#313244",
+	menuSelB: "#cba6f7", border: "#313244",
 	hlKw: "#cba6f7", hlBi: "#89dceb", hlStr: "#a6e3a1",
 	hlCmt: "#6c7086", hlNum: "#fab387", hlPun: "#89b4fa",
 	spark: "#cba6f7", sparkPeak: "#f9e2af",
-	heat0: "#45475a", heat1: "#f9e2af", heat2: "#fab387",
-	heat3: "#eba0ac", heat4: "#f38ba8",
+	heat1: "#f9e2af", heat2: "#fab387", heat3: "#eba0ac", heat4: "#f38ba8",
 	heatBg1: "#3d3521", heatBg2: "#3d2b15", heatBg3: "#3d1e22", heatBg4: "#3d1515",
 }
 
-// ── Catppuccin Latte (light) ───────────────────────────────────────────────
+// ── Catppuccin Latte ──────────────────────────────────────────────────────────
 
 var latte = Theme{
+	name: "latte",
 	base: "#eff1f5", mantle: "#e6e9ef", crust: "#dce0e8",
 	text: "#4c4f69", subtext0: "#6c6f85", subtext1: "#5c5f77",
 	surface0: "#ccd0da", surface1: "#bcc0cc", surface2: "#acb0be",
@@ -112,24 +102,48 @@ var latte = Theme{
 	sky: "#04a5e5", teal: "#179299", green: "#40a02b",
 	yellow: "#df8e1d", peach: "#fe640b", maroon: "#e64553",
 	red: "#d20f39", mauve: "#8839ef", pink: "#ea76cb",
-	flamingo: "#dd7878", rosewater: "#dc8a78",
 
 	correct: "#40a02b", wrong: "#d20f39", pending: "#acb0be",
-	cursor: "#8839ef", title: "#8839ef",
+	cursor: "#8839ef",
 	wpm: "#ea76cb", acc: "#179299", timer: "#df8e1d",
-	subtle: "#9ca0b0", hint: "#bcc0cc",
 	pbFg: "#eff1f5", pbBg: "#df8e1d",
-	menuSel: "#eff1f5", menuSelB: "#8839ef", menuDim: "#9ca0b0",
-	border: "#bcc0cc",
+	menuSelB: "#8839ef", border: "#bcc0cc",
 	hlKw: "#8839ef", hlBi: "#04a5e5", hlStr: "#40a02b",
 	hlCmt: "#9ca0b0", hlNum: "#fe640b", hlPun: "#1e66f5",
 	spark: "#8839ef", sparkPeak: "#df8e1d",
-	heat0: "#acb0be", heat1: "#df8e1d", heat2: "#fe640b",
-	heat3: "#e64553", heat4: "#d20f39",
+	heat1: "#df8e1d", heat2: "#fe640b", heat3: "#e64553", heat4: "#d20f39",
 	heatBg1: "#fdf6e3", heatBg2: "#fdebd0", heatBg3: "#fde2e4", heatBg4: "#fdd6d8",
 }
 
-// ── Runtime theme application ──────────────────────────────────────────────
+// ── Gruvbox Dark ──────────────────────────────────────────────────────────────
+
+var gruvbox = Theme{
+	name: "gruvbox",
+	base: "#282828", mantle: "#1d2021", crust: "#1d2021",
+	text: "#ebdbb2", subtext0: "#d5c4a1", subtext1: "#bdae93",
+	surface0: "#3c3836", surface1: "#504945", surface2: "#665c54",
+	overlay0: "#7c6f64", overlay1: "#928374",
+	blue: "#83a598", lavender: "#d3869b", sapphire: "#76a9b3",
+	sky: "#8ec07c", teal: "#8ec07c", green: "#b8bb26",
+	yellow: "#fabd2f", peach: "#fe8019", maroon: "#cc241d",
+	red: "#fb4934", mauve: "#d3869b", pink: "#d3869b",
+
+	correct: "#b8bb26", wrong: "#fb4934", pending: "#504945",
+	cursor: "#fabd2f",
+	wpm: "#fabd2f", acc: "#8ec07c", timer: "#83a598",
+	pbFg: "#282828", pbBg: "#fabd2f",
+	menuSelB: "#d3869b", border: "#3c3836",
+	hlKw: "#fb4934", hlBi: "#83a598", hlStr: "#b8bb26",
+	hlCmt: "#928374", hlNum: "#d3869b", hlPun: "#fe8019",
+	spark: "#d3869b", sparkPeak: "#fabd2f",
+	heat1: "#fabd2f", heat2: "#fe8019", heat3: "#fb4934", heat4: "#cc241d",
+	heatBg1: "#3d3500", heatBg2: "#3d2200", heatBg3: "#3d1500", heatBg4: "#2d0d0d",
+}
+
+// ── Theme cycle ───────────────────────────────────────────────────────────────
+
+// themes is the ordered cycle: Ctrl+T steps through them.
+var themes = []Theme{mocha, latte, gruvbox}
 
 var activeTheme = mocha
 
@@ -138,7 +152,6 @@ func applyTheme(t Theme) {
 	correctStyle     = lipgloss.NewStyle().Foreground(t.correct)
 	incorrectStyle   = lipgloss.NewStyle().Foreground(t.wrong).Background(t.heatBg4)
 	pendingStyle     = lipgloss.NewStyle().Foreground(t.pending)
-	// Solid block cursor — bg on the cursor char rather than underline
 	cursorStyle      = lipgloss.NewStyle().Foreground(t.base).Background(t.cursor).Bold(true)
 	titleStyle       = lipgloss.NewStyle().Foreground(t.mauve).Bold(true)
 	wpmStyle         = lipgloss.NewStyle().Foreground(t.wpm).Bold(true)
@@ -167,9 +180,6 @@ func applyTheme(t Theme) {
 
 func init() { applyTheme(mocha) }
 
-func isDark() bool { return activeTheme.base == mocha.base }
-
-// keyHeatStyle returns the correct lipgloss.Style for a key given its mistake count.
 func keyHeatStyle(count, maxCount int) lipgloss.Style {
 	base := lipgloss.NewStyle().Padding(0, 1).Bold(false)
 	if count == 0 || maxCount == 0 {
