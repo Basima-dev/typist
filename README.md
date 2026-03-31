@@ -1,4 +1,3 @@
-
 ---
 
 <div align="center">
@@ -8,7 +7,7 @@
 
 <!-- Tagline -->
 <p align="center">
-  <b>⚡ A fast, offline typing test for developers</b><br>
+  <b>A fast, offline typing test for developers</b><br>
   <sub>No account. No paywall. No internet required.</sub>
 </p>
 
@@ -37,31 +36,31 @@
 
 <!-- Table of Contents -->
 <details open>
-<summary><b>📑 Table of Contents</b></summary>
+<summary><b>Table of Contents</b></summary>
 
-- [✨ Features](#-features)
-- [🚀 Quick Start](#-quick-start)
-- [📦 Installation](#-installation)
-- [🎮 Usage](#-usage)
-- [🖥️ Terminal UI](#️-terminal-ui)
-- [🌐 Web UI](#-web-ui)
-- [💻 Code Mode](#-code-mode)
-- [🎯 Blind Mode](#-blind-mode)
-- [📊 Scores & Export](#-scores--export)
-- [🏗️ Architecture](#️-architecture)
-- [🛠️ Tech Stack](#️-tech-stack)
-- [🗺️ Roadmap](#️-roadmap)
-- [📄 License](#-license)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Terminal UI](#terminal-ui)
+- [Web UI](#web-ui)
+- [Code Mode](#code-mode)
+- [Blind Mode](#blind-mode)
+- [Scores & Export](#scores--export)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Roadmap](#roadmap)
+- [License](#license)
 
 </details>
 
 ---
 
-## ✨ Features
+## Features
 
 <div align="center">
 
-| Feature | Terminal 🖥️ | Web 🌐 |
+| Feature | Terminal | Web |
 |:---|:---:|:---:|
 | **Word Mode** — 30 common words | ✅ | ✅ |
 | **Time Mode** — 15 / 30 / 60 / 120s | ✅ | ✅ |
@@ -81,7 +80,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Clone and build
@@ -95,7 +94,7 @@ typist --web    # Web UI (auto-opens browser)
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 - **Go 1.21+** — [Download here](https://go.dev/dl/)
@@ -119,11 +118,11 @@ mv typist ~/.local/bin/  # Linux/Mac
 mv typist $GOPATH/bin/   # If GOPATH is set
 ```
 
-> 💡 **Tip:** The binary is completely self-contained — no runtime dependencies needed!
+> **Tip:** The binary is completely self-contained — no runtime dependencies needed!
 
 ---
 
-## 🎮 Usage
+## Usage
 
 ```bash
 typist          # Launch terminal UI
@@ -133,9 +132,9 @@ typist --help   # Show all options
 
 ---
 
-## 🖥️ Terminal UI
+## Terminal UI
 
-### 🎛️ Menu Controls
+### Menu Controls
 
 | Key | Action |
 |:---:|:---|
@@ -144,7 +143,7 @@ typist --help   # Show all options
 | `Enter` | Start test |
 | `Esc` / `q` | Quit |
 
-### ⌨️ Typing Controls
+### Typing Controls
 
 | Key | Action |
 |:---:|:---|
@@ -155,7 +154,7 @@ typist --help   # Show all options
 | `Backspace` | Delete last character |
 | `Esc` | Quit |
 
-### 📈 Results Screen
+### Results Screen
 
 | Key | Action |
 |:---:|:---|
@@ -168,25 +167,25 @@ typist --help   # Show all options
 
 ---
 
-## 🌐 Web UI
+## Web UI
 
 The web interface provides a beautiful browser-based experience with:
 
-- 🎨 **Chart.js** WPM graphs
-- ⌨️ **Visual keyboard** mistake heatmap
-- 🎯 Same core typing engine as TUI
-- 📱 Responsive design
+- **Chart.js** WPM graphs
+- **Visual keyboard** mistake heatmap
+- Same core typing engine as TUI
+- Responsive design
 
 Launch with:
 ```bash
 typist --web
 ```
 
-> 📝 The server automatically picks a free port on `127.0.0.1` — no conflicts, no firewall prompts.
+> The server automatically picks a free port on `127.0.0.1` — no conflicts, no firewall prompts.
 
 ---
 
-## 💻 Code Mode
+## Code Mode
 
 Type real, idiomatic code snippets with full syntax highlighting:
 
@@ -201,30 +200,30 @@ Type real, idiomatic code snippets with full syntax highlighting:
 
 </div>
 
-### 🎨 Syntax Highlighting
+### Syntax Highlighting
 
 Powered by **[Chroma](https://github.com/alecthomas/chroma)** — the same library used by Hugo, Goldmark, and GitHub's Go tooling.
 
 Keywords, builtins, strings, comments, numbers, and operators each render in distinct colors using the **Catppuccin Mocha** palette.
 
-### ⚡ Special Keys in Code Mode
+### Special Keys in Code Mode
 
 - `Tab` and `Enter` are **live keystrokes** — you must type them correctly
 - Perfect for building **muscle memory** on real code structure
 
 ---
 
-## 🎯 Blind Mode
+## Blind Mode
 
 Press `Ctrl+B` during any test to toggle **Blind Mode**.
 
-> 👁️🚫 Every typed character becomes a `·` dot — green if correct, red if wrong — but the actual character is **never shown**.
+> Every typed character becomes a `·` dot — green if correct, red if wrong — but the actual character is **never shown**.
 
 Forces you to type from **memory** rather than watching your hands. Essential for improving muscle memory!
 
 ---
 
-## 📊 Scores & Export
+## Scores & Export
 
 All results are automatically saved to `~/.typist/scores.json`.
 
@@ -235,28 +234,28 @@ All results are automatically saved to `~/.typist/scores.json`.
 | `J` | JSON | `~/typist-export-<timestamp>.json` |
 | `C` | CSV | `~/typist-export-<timestamp>.csv` |
 
-> 📊 The CSV is clean enough to drop into Excel or any data tool for your own analysis.
+> The CSV is clean enough to drop into Excel or any data tool for your own analysis.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 typist/
-├── 📄 main.go          # Entry point, --web flag
-├── 🧠 model.go         # Bubble Tea model — all states, update, view
-├── 🎨 highlight.go     # Chroma tokenizer → lipgloss StyleMap
-├── 📝 words.go         # Word/quote/code generation + line wrapping
-├── 📚 snippets.go      # Code snippet library (Go, JS, Python, Rust)
-├── 🏆 scores.go        # Persistent scores, PB tracking, JSON/CSV export
-├── 💅 styles.go        # lipgloss styles (Catppuccin Mocha)
-├── 🌐 web.go           # Embedded HTTP server for --web mode
-├── 📁 web/
-│   └── 📄 index.html   # Single-file web UI (Chart.js, no other deps)
-└── 📜 quotes.json      # Embedded literary quotes
+├── main.go          # Entry point, --web flag
+├── model.go         # Bubble Tea model — all states, update, view
+├── highlight.go     # Chroma tokenizer → lipgloss StyleMap
+├── words.go         # Word/quote/code generation + line wrapping
+├── snippets.go      # Code snippet library (Go, JS, Python, Rust)
+├── scores.go        # Persistent scores, PB tracking, JSON/CSV export
+├── styles.go        # lipgloss styles (Catppuccin Mocha)
+├── web.go           # Embedded HTTP server for --web mode
+├── web/
+│   └── index.html   # Single-file web UI (Chart.js, no other deps)
+└── quotes.json      # Embedded literary quotes
 ```
 
-### 🔑 Key Design Decisions
+### Key Design Decisions
 
 | Decision | Rationale |
 |:---|:---|
@@ -268,7 +267,7 @@ typist/
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 <div align="center">
 
@@ -282,16 +281,16 @@ typist/
 
 </div>
 
-### 🤔 Why Go?
+### Why Go?
 
-- ⚡ **Single binary** — easy distribution
-- 🚀 **Fast startup** — instant feel
-- 📦 **`go:embed`** — zero-dependency distribution
-- 🎯 **Dogfooding** — you're literally typing Go while learning Go
+- **Single binary** — easy distribution
+- **Fast startup** — instant feel
+- **`go:embed`** — zero-dependency distribution
+- **Dogfooding** — you're literally typing Go while learning Go
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [ ] WPM graph in TUI (unicode sparkline → full bar chart)
 - [ ] Dark / light theme toggle
@@ -301,17 +300,16 @@ typist/
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
 
 <div align="center">
 
-**[⬆ Back to Top](#-typist)**
+**[Back to Top](#typist)**
 
-Made with ⚡ by [chuma-beep](https://github.com/chuma-beep)
+Made by [chuma-beep](https://github.com/chuma-beep)
 
 </div>
 
 ---
-
