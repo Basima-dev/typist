@@ -1,4 +1,3 @@
-<div align="center">
 
 <!-- ASCII Art Logo -->
 <pre align="center">
@@ -31,7 +30,6 @@
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="go version"></a>
 </p>
 
-</div>
 
 
 <!-- Table of Contents -->
