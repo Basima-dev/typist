@@ -1,5 +1,6 @@
 ```markdown
 <div align="center">
+
 <pre>
 ╔══════════════════════════════════════════════════════════════════╗
 ║                                                                  ║
@@ -16,18 +17,16 @@
 ╚══════════════════════════════════════════════════════════════════╝
 </pre>
 
-<p>
-  <a href="https://github.com/chuma-beep/typist/stargazers"><img src="https://img.shields.io/github/stars/chuma-beep/typist?style=flat-square&color=yellow&logo=github" alt="stars"></a>
-  <a href="https://github.com/chuma-beep/typist/network/members"><img src="https://img.shields.io/github/forks/chuma-beep/typist?style=flat-square&color=blue&logo=github" alt="forks"></a>
-  <a href="https://github.com/chuma-beep/typist/issues"><img src="https://img.shields.io/github/issues/chuma-beep/typist?style=flat-square&color=red&logo=github" alt="issues"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/chuma-beep/typist?style=flat-square&color=green&logo=open-source-initiative" alt="license"></a>
-  <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="go version"></a>
-</p>
+[![stars](https://img.shields.io/github/stars/chuma-beep/typist?style=flat-square&color=yellow&logo=github)](https://github.com/chuma-beep/typist/stargazers)
+[![forks](https://img.shields.io/github/forks/chuma-beep/typist?style=flat-square&color=blue&logo=github)](https://github.com/chuma-beep/typist/network/members)
+[![issues](https://img.shields.io/github/issues/chuma-beep/typist?style=flat-square&color=red&logo=github)](https://github.com/chuma-beep/typist/issues)
+[![license](https://img.shields.io/github/license/chuma-beep/typist?style=flat-square&color=green&logo=open-source-initiative)](LICENSE)
+[![go version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
 
 <pre>
 ┌─────────────────────────────────────────────────────────────────┐
 │  $ typist          # Terminal UI                                │
-│  $ typist --web    # Web UI (auto-opens browser)                │
+│  $ typist --web    # Web UI (auto                               | 
 │  $ typist --help   # Show all options                           │
 └─────────────────────────────────────────────────────────────────┘
 </pre>
