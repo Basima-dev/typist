@@ -1,13 +1,13 @@
-###
+Here's a clean, ready-to-copy version you can paste directly into your `README.md`:
 
 ```markdown
 <div align="center">
 
 # Typist
 
-A fast, offline typing test — Terminal + Web UI
+**A fast, offline typing test** — Terminal + Web UI
 
-**No account. No paywall. No internet required.**
+No account. No paywall. No internet required.
 
 ```ascii
 ╔══════════════════════════════════════════════════════════════════╗
@@ -28,7 +28,7 @@ A fast, offline typing test — Terminal + Web UI
 [![Forks](https://img.shields.io/github/forks/chuma-beep/typist?style=flat-square&color=blue&logo=github)](https://github.com/chuma-beep/typist/network/members)
 [![Issues](https://img.shields.io/github/issues/chuma-beep/typist?style=flat-square&color=red&logo=github)](https://github.com/chuma-beep/typist/issues)
 [![License](https://img.shields.io/github/license/chuma-beep/typist?style=flat-square&color=green&logo=open-source-initiative)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
 
 ```ascii
 ┌─────────────────────────────────────────────────────────────────┐
@@ -50,7 +50,6 @@ cd typist
 go mod tidy
 go build -o typist .
 
-# Run
 ./typist          # Terminal UI
 ./typist --web    # Web UI
 ```
@@ -110,7 +109,7 @@ go build -o typist .
 
 ## Code Mode
 
-Type real code snippets with beautiful syntax highlighting powered by **Chroma**:
+Type real code snippets with syntax highlighting powered by **Chroma**:
 
 | Language     | Snippets | Examples                              |
 |--------------|----------|---------------------------------------|
@@ -127,7 +126,7 @@ Type real code snippets with beautiful syntax highlighting powered by **Chroma**
 Ctrl + B → Every character becomes · 
 (green = correct, red = wrong)
 
-Forces you to type from muscle memory.
+Forces muscle memory typing.
 ```
 
 ---
@@ -186,6 +185,9 @@ typist/
 │ MIT License • github.com/chuma-beep/typist                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
-nd readability
-5. Better 
-](https://grok.com/c/3a4ab94f-00a6-4296-a624-f14b1e573cc2?rid=c02585be-e483-487d-a3ab-ad050262d9b6)
+
+```
+
+**Just copy everything above** (from `<div align="center">` down to the last box) and paste it into your `README.md` file.
+
+Would you like a version with a smaller logo or more compact layout?
