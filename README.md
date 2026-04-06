@@ -1,11 +1,9 @@
-Here's a clean, ready-to-copy version you can paste directly into your `README.md`:
-
 ```markdown
 <div align="center">
 
 # Typist
 
-**A fast, offline typing test** — Terminal + Web UI
+***A fast, offline typing test*** — Terminal + Web UI
 
 No account. No paywall. No internet required.
 
@@ -188,6 +186,4 @@ typist/
 
 ```
 
-**Just copy everything above** (from `<div align="center">` down to the last box) and paste it into your `README.md` file.
 
-Would you like a version with a smaller logo or more compact layout?
