@@ -15,6 +15,7 @@
 ║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝
 </pre>
+
 <p>
   <a href="https://github.com/chuma-beep/typist/stargazers"><img src="https://img.shields.io/github/stars/chuma-beep/typist?style=flat-square&color=yellow&logo=github" alt="stars"></a>
   <a href="https://github.com/chuma-beep/typist/network/members"><img src="https://img.shields.io/github/forks/chuma-beep/typist?style=flat-square&color=blue&logo=github" alt="forks"></a>
@@ -22,6 +23,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/chuma-beep/typist?style=flat-square&color=green&logo=open-source-initiative" alt="license"></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="go version"></a>
 </p>
+
 <pre>
 ┌─────────────────────────────────────────────────────────────────┐
 │  $ typist          # Terminal UI                                │
@@ -29,6 +31,7 @@
 │  $ typist --help   # Show all options                           │
 └─────────────────────────────────────────────────────────────────┘
 </pre>
+
 </div>
 
 ---
@@ -49,7 +52,7 @@ cd typist && go mod tidy && go build -o typist .
 
 ## Features
 
-<pre>
+```
 ┌────────────────────────────────┬──────────┬──────────┐
 │ Feature                        │ Terminal │   Web    │
 ├────────────────────────────────┼──────────┼──────────┤
@@ -67,13 +70,13 @@ cd typist && go mod tidy && go build -o typist .
 │ Export to JSON / CSV           │    ✓     │    ✗     │
 │ Single Binary, Zero Deps       │    ✓     │    ✓     │
 └────────────────────────────────┴──────────┴──────────┘
-</pre>
+```
 
 ---
 
 ## Terminal UI
 
-<pre>
+```
 ┌─────────────────────────────────────────────────────────────────┐
 │  CONTROLS                                                       │
 ├─────────────────────────────────────────────────────────────────┤
@@ -98,7 +101,7 @@ cd typist && go mod tidy && go build -o typist .
 │    C        Export to CSV                                       │
 │    Esc      Quit                                                │
 └─────────────────────────────────────────────────────────────────┘
-</pre>
+```
 
 ---
 
@@ -106,7 +109,7 @@ cd typist && go mod tidy && go build -o typist .
 
 Type real snippets with syntax highlighting powered by **Chroma**:
 
-<pre>
+```
 ┌────────────┬──────────┬────────────────────────────────────────┐
 │ Language   │ Snippets │ Examples                               │
 ├────────────┼──────────┼────────────────────────────────────────┤
@@ -115,25 +118,25 @@ Type real snippets with syntax highlighting powered by **Chroma**:
 │ Python     │    5     │ Quicksort, LRU cache, decorators       │
 │ Rust       │    5     │ Pattern matching, traits, generics     │
 └────────────┴──────────┴────────────────────────────────────────┘
-</pre>
+```
 
 ---
 
 ## Blind Mode
 
-<pre>
+```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Ctrl+B  →  Every char becomes · (green=correct, red=wrong)     │
 │                                                                 │
 │  Forces typing from memory. Essential for muscle memory.        │
 └─────────────────────────────────────────────────────────────────┘
-</pre>
+```
 
 ---
 
 ## Scores & Export
 
-<pre>
+```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Storage:  ~/.typist/scores.json                               │
 │                                                                 │
@@ -141,13 +144,13 @@ Type real snippets with syntax highlighting powered by **Chroma**:
 │    J  →  ~/typist-export-<timestamp>.json                       │
 │    C  →  ~/typist-export-<timestamp>.csv                        │
 └─────────────────────────────────────────────────────────────────┘
-</pre>
+```
 
 ---
 
 ## Tech Stack
 
-<pre>
+```
 ┌────────────────────┬─────────────────────────┬──────────────────┐
 │ Component          │ Technology              │ Purpose          │
 ├────────────────────┼─────────────────────────┼──────────────────┤
@@ -157,7 +160,7 @@ Type real snippets with syntax highlighting powered by **Chroma**:
 │ Web Charts         │ Chart.js                │ WPM graphs       │
 │ Core               │ Go Standard Library     │ HTTP, JSON, CSV  │
 └────────────────────┴─────────────────────────┴──────────────────┘
-</pre>
+```
 
 ---
 
@@ -189,9 +192,9 @@ typist/
 
 ---
 
-<pre>
+```
 ┌─────────────────────────────────────────────────────────────────┐
 │  MIT License  │  github.com/chuma-beep/typist                  │
 └─────────────────────────────────────────────────────────────────┘
-</pre>
+```
 ```
