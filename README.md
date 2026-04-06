@@ -1,8 +1,5 @@
- Here's the complete README ready to copy and paste:
-
 ```markdown
 <div align="center">
-
 <pre>
 ╔══════════════════════════════════════════════════════════════════╗
 ║                                                                  ║
@@ -18,7 +15,6 @@
 ║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝
 </pre>
-
 <p>
   <a href="https://github.com/chuma-beep/typist/stargazers"><img src="https://img.shields.io/github/stars/chuma-beep/typist?style=flat-square&color=yellow&logo=github" alt="stars"></a>
   <a href="https://github.com/chuma-beep/typist/network/members"><img src="https://img.shields.io/github/forks/chuma-beep/typist?style=flat-square&color=blue&logo=github" alt="forks"></a>
@@ -26,7 +22,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/chuma-beep/typist?style=flat-square&color=green&logo=open-source-initiative" alt="license"></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="go version"></a>
 </p>
-
 <pre>
 ┌─────────────────────────────────────────────────────────────────┐
 │  $ typist          # Terminal UI                                │
@@ -34,7 +29,6 @@
 │  $ typist --help   # Show all options                           │
 └─────────────────────────────────────────────────────────────────┘
 </pre>
-
 </div>
 
 ---
@@ -144,8 +138,8 @@ Type real snippets with syntax highlighting powered by **Chroma**:
 │  Storage:  ~/.typist/scores.json                               │
 │                                                                 │
 │  Export (from results screen):                                  │
-│    J  →  ~/typist-export-&lt;timestamp&gt;.json                       │
-│    C  →  ~/typist-export-&lt;timestamp&gt;.csv                        │
+│    J  →  ~/typist-export-<timestamp>.json                       │
+│    C  →  ~/typist-export-<timestamp>.csv                        │
 └─────────────────────────────────────────────────────────────────┘
 </pre>
 
