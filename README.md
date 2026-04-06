@@ -267,29 +267,6 @@ typist/
 
 ---
 
-## Tech Stack
-
-<div align="center">
-
-| Component | Technology | Purpose |
-|:---:|:---:|:---|
-| **TUI Framework** | [Bubble Tea](https://github.com/charmbracelet/bubbletea) | Elm architecture for terminal apps |
-| **Terminal Styling** | [Lipgloss](https://github.com/charmbracelet/lipgloss) | Terminal styling and layout |
-| **Syntax Highlighting** | [Chroma v2](https://github.com/alecthomas/chroma) | 300+ language tokenization |
-| **Web Charts** | [Chart.js](https://www.chartjs.org/) | WPM graphs in web UI (CDN) |
-| **Core** | Go Standard Library | HTTP server, JSON, CSV, file I/O |
-
-</div>
-
-### Why Go?
-
-- **Single binary** — easy distribution
-- **Fast startup** — instant feel
-- **`go:embed`** — zero-dependency distribution
-- **Dogfooding** — you're literally typing Go while learning Go
-
----
-
 ## Roadmap
 
 - [ ] WPM graph in TUI (unicode sparkline → full bar chart)
@@ -300,10 +277,11 @@ typist/
 
 ---
 
-## License
-
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
-
+<pre>
+┌─────────────────────────────────────────────────────────────────┐
+│  MIT License  │  github.com/chuma-beep/typist                  │
+└─────────────────────────────────────────────────────────────────┘
+</pre>
 <div align="center">
 
 **[Back to Top](#typist)**
