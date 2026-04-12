@@ -1,8 +1,5 @@
 package main
 
-// game.go
-// Self-contained game mode: falling words, target locking, projectiles, lives.
-// All rendering via lipgloss — no external dependencies.
 
 import (
 	"fmt"
