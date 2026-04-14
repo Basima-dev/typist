@@ -24,6 +24,7 @@ const (
 	stateConfirmQuit // esc confirmation dialog
 	stateGame        // game mode active
 	stateGameOver    // game over screen
+	stateProfile     // profile dashboard
 )
 
 type testMode int
@@ -145,7 +146,8 @@ type Model struct {
 	lines   []string
 	offsets []int
 
-	gameState *GameState
+	gameState   *GameState
+	profileData ProfileData
 }
 
 func NewModel() Model {
@@ -279,6 +281,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		// Ctrl+P or Ctrl+O opens profile from any screen (except when already in profile)
+		if (msg.Type == tea.KeyCtrlP || msg.Type == tea.KeyCtrlO) && m.state != stateProfile {
+			m.prevState = m.state
+			m.profileData = loadProfileData()
+			m.state = stateProfile
+		}
 		switch m.state {
 		case stateMenu:
 			return m.updateMenu(msg)
@@ -296,6 +304,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateGameMode(msg)
 		case stateGameOver:
 			return m.updateGameOver(msg)
+		case stateProfile:
+			return m.updateProfile(msg)
 		}
 	}
 	return m, nil
@@ -825,6 +835,8 @@ func (m Model) View() string {
 		if m.gameState != nil {
 			return m.gameState.renderGameOver(m.width, m.height)
 		}
+	case stateProfile:
+		return viewProfile(m.profileData, m.width, m.height)
 	}
 	return ""
 }
