@@ -917,9 +917,13 @@ func (m Model) viewMenu() string {
 	themeLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2).
 		Render("ctrl+t  theme: " + activeTheme.name)
 
+	// Profile indicator
+	profileLabel := lipgloss.NewStyle().Foreground(activeTheme.surface2).
+		Render("ctrl+o  profile")
+
 	body := lipgloss.JoinVertical(lipgloss.Center,
 		logo, "", tagline, "", "", sectionLabel, "",
-		modeRow+subRow, "", "", hint, "", themeLabel,
+		modeRow+subRow, "", "", hint, "", themeLabel, profileLabel,
 	)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
