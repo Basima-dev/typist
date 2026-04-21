@@ -211,7 +211,7 @@ Run Typist instantly — no need to install Go or any dependencies.
 
 *1. Clone the repository:*
 ```bash
-   git clone https://github.com/Basima-dev/typist.git
+   git clone https://github.com/chuma-beep/typist.git
    cd typist
 ```
 *2. Run the application:*
