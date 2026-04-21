@@ -1,0 +1,9 @@
+services:
+  typist:
+    build: .
+    container_name: typist
+    stdin_open: true
+    tty: true
+    network_mode: host
+
+
