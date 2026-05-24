@@ -1291,7 +1291,7 @@ func (m Model) viewTyping() string {
 					}
 				}
 			} else if absPos == cursorPos {
-				// Solid block cursor — background colour, not underline
+				// Monkeytype-style cursor — underline the pending character, char stays visible
 				sb.WriteString(cursorStyle.Render(display))
 			} else {
 				// Pending text

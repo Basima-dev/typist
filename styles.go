@@ -152,7 +152,7 @@ func applyTheme(t Theme) {
 	correctStyle     = lipgloss.NewStyle().Foreground(t.correct)
 	incorrectStyle   = lipgloss.NewStyle().Foreground(t.wrong).Background(t.heatBg4)
 	pendingStyle     = lipgloss.NewStyle().Foreground(t.pending)
-	cursorStyle      = lipgloss.NewStyle().Foreground(t.base).Background(t.cursor).Bold(true)
+	cursorStyle      = lipgloss.NewStyle().Foreground(t.cursor).Underline(true)
 	titleStyle       = lipgloss.NewStyle().Foreground(t.mauve).Bold(true)
 	wpmStyle         = lipgloss.NewStyle().Foreground(t.wpm).Bold(true)
 	accStyle         = lipgloss.NewStyle().Foreground(t.acc).Bold(true)
