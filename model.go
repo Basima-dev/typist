@@ -1602,7 +1602,7 @@ func (m Model) viewResults() string {
 		parts = append(parts, exportLine)
 	}
 
-	body := lipgloss.JoinVertical(lipgloss.Left, parts...)
+	body := lipgloss.JoinVertical(lipgloss.Center, parts...)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
 
